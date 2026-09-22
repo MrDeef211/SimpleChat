@@ -27,7 +27,7 @@ namespace SimpleChat.Interfaces
         /// 
         /// </summary>
         /// <param name="reason"></param>
-        void Disconect(string reason);
+        void Disconnect(string reason);
 
         /// <summary>
         /// 
