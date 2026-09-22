@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Abstractions.DTO;
 
 namespace SimpleChat.Interfaces
 {
@@ -14,14 +15,14 @@ namespace SimpleChat.Interfaces
         /// </summary>
         /// <param name="address"></param>
         /// <returns>result</returns>
-        int Connect(string address);
+        int Connect(Guid address);
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="address"></param>
         /// <returns>result</returns>
-        Task<int> ConnectAsync(string address, CancellationToken token = default);
+        Task<int> ConnectAsync(Guid address, CancellationToken token = default);
 
         /// <summary>
         /// 
@@ -41,17 +42,17 @@ namespace SimpleChat.Interfaces
         /// </summary>
         /// <param name="message"></param>
         /// <returns>result</returns>
-        int Send(string message);
+        int Send(MessageDTO message);
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="message"></param>
         /// <returns>result</returns>
-        Task<int> SendAsync(string message, CancellationToken token = default);
+        Task<int> SendAsync(MessageDTO message, CancellationToken token = default);
 
         /// <summary>
-        /// Установить статус приёма сообщений
+        /// 
         /// </summary>
         /// <param name="recive">Принимать?</param>
         /// <returns></returns>

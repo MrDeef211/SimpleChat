@@ -1,18 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Abstractions.Commands;
+using Abstractions.DTO;
 
 namespace SimpleChat.MessageService
 {
     // Для внутреннего использования IConnector, не использовать IConnector напрямую
     internal interface IMessageService
     {
-        event EventHandler<string> MessageReceived;
+        event EventHandler<ReceiveMessageCommand> MessageReceived;
 
-        void SendMessage(string message);
+        void SendMessage(SendMessageCommand command);
 
-        Task SendMessageAsync(string message);        
+        Task SendMessageAsync(SendMessageCommand command);
     }
 }
