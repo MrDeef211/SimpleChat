@@ -32,8 +32,6 @@ namespace GUI
         {
             InitializeComponent();
 
-            LstUsers.ItemsSource = _users;
-
             _messageFactory = messageFactory;
             _messageHandler = messageHandler;
             _connectionService = connectionService;
@@ -41,18 +39,26 @@ namespace GUI
             _userInfo = userInfo;
 
             _messageHandler.MessageReceived += OnMessageReceived;
-
             _connectionService.UserConnected += OnUserConnected;
             _connectionService.UserDisconnected += OnUserDisconnected;
 
-            TxtLocalName.Text = _userInfo.LocalName;
-            TxtLocalId.Text = _userInfo.UserId.ToString("N").Substring(0, 8) + "…";
+            LstUsers.ItemsSource = _users;
+            LstUsers.SelectionChanged += LstUsers_SelectionChanged;
 
-            LstUsers.SelectionChanged += (_, __) =>
-            {
-                if (LstUsers.SelectedItem is string name)
-                    TxtReceiver.Text = name;
-            };
+            TxtLocalName.Text = _userInfo.LocalName;
+            TxtLocalId.Text = _userInfo.UserId.ToString("N")[..8] + "…";
+
+            UpdateSendAvailability();
+        }
+
+        private void LstUsers_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (LstUsers.SelectedItem is UserListItem item)
+                TxtReceiver.Text = item.Name;
+            else
+                TxtReceiver.Text = string.Empty;
+
+            UpdateSendAvailability();
         }
 
         private void OnMessageReceived(object? sender, MessageReceivedEventArgs e)
@@ -67,18 +73,24 @@ namespace GUI
         }
 
         private void OnUserConnected(object? sender, string name) =>
-        Dispatcher.Invoke(() =>
-        {
-            var item = _users.FirstOrDefault(u => u.Name == name);
-            if (item != null) item.IsConnected = true;
-        });
+            Dispatcher.Invoke(() =>
+            {
+                var item = _users.FirstOrDefault(u => u.Name == name);
+                if (item != null) item.IsConnected = true;
+                UpdateSendAvailability();
+            });
 
         private void OnUserDisconnected(object? sender, string name) =>
-        Dispatcher.Invoke(() =>
-        {
-            var item = _users.FirstOrDefault(u => u.Name == name);
-            if (item != null) item.IsConnected = false;
-        });
+            Dispatcher.Invoke(() =>
+            {
+                var item = _users.FirstOrDefault(u => u.Name == name);
+                if (item != null) item.IsConnected = false;
+
+                if (TxtReceiver.Text == name)
+                    TxtReceiver.Clear();
+
+                UpdateSendAvailability();
+            });
 
         /// <summary>
         /// Безопасно приводит DateTime к локальному времени, даже если Kind был потерян при сериализации.
@@ -89,6 +101,11 @@ namespace GUI
             DateTimeKind.Utc => dt.ToLocalTime(),
             _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc).ToLocalTime()
         };
+
+        private void UpdateSendAvailability()
+        {
+            BtnSend.IsEnabled = LstUsers.SelectedItem is UserListItem;
+        }
 
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
@@ -153,9 +170,6 @@ namespace GUI
             try
             {
                 await _connectionService.DisconnectAsync(user.Name, "user requested");
-                // Индикатор обновится сам через событие UserDisconnected.
-                if (TxtReceiver.Text == user.Name)
-                    TxtReceiver.Clear();
             }
             catch (Exception ex)
             {
@@ -193,29 +207,43 @@ namespace GUI
             }
         }
 
-        private async void LstUsers_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void LstUsers_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (LstUsers.SelectedItem is UserListItem)
+            if (LstUsers.SelectedItem is UserListItem { IsConnected: false })
                 BtnConnect_Click(sender, e);
         }
 
         private async void BtnSend_Click(object sender, RoutedEventArgs e)
         {
-            string message = TxtMessage.Text;
-            string receiver = TxtReceiver.Text;
-
-            if (string.IsNullOrWhiteSpace(message) || string.IsNullOrWhiteSpace(receiver))
+            if (LstUsers.SelectedItem is not UserListItem user)
             {
-                MessageBox.Show("Выберите получателя и введите текст.");
+                MessageBox.Show("Выберите получателя.");
                 return;
             }
 
+            string message = TxtMessage.Text;
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                MessageBox.Show("Введите текст сообщения.");
+                return;
+            }
+
+            BtnSend.IsEnabled = false;
             try
             {
-                BtnSend.IsEnabled = false;
-                await _messageFactory.SendMessageAsync(message, receiver);
+                if (!user.IsConnected)
+                {
+                    int result = await _connectionService.ConnectAsync(user.Name);
+                    if (result < 200 || result >= 300)
+                    {
+                        MessageBox.Show($"Не удалось подключиться к '{user.Name}' (код {result}).");
+                        return;
+                    }
+                }
 
-                LstMessages.Items.Add($"[{DateTime.Now:HH:mm:ss}] Я → {receiver}: {message}");
+                await _messageFactory.SendMessageAsync(message, user.Name);
+
+                LstMessages.Items.Add($"[{DateTime.Now:HH:mm:ss}] Я → {user.Name}: {message}");
                 LstMessages.ScrollIntoView(LstMessages.Items[^1]);
 
                 TxtMessage.Clear();
@@ -226,8 +254,8 @@ namespace GUI
             }
             finally
             {
-                BtnSend.IsEnabled = true;
                 TxtMessage.Focus();
+                UpdateSendAvailability(); 
             }
         }
 

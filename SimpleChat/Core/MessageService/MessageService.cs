@@ -92,7 +92,6 @@ namespace SimpleChat.Core.MessageService
         {
             var id = _registry.GetId(user);
             _connector.Disconnect(id, reason);
-            _registry.Remove(user);
             MarkDisconnected(user);
         }
 
@@ -100,7 +99,6 @@ namespace SimpleChat.Core.MessageService
         {
             var id = _registry.GetId(user);
             await _connector.DisconnectAsync(id, reason).ConfigureAwait(false);
-            _registry.Remove(user);
             MarkDisconnected(user);
         }
 
