@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace SimpleChat.Interfaces
 {
+    // Не использовать напрямую, только через IMessageService
     public interface IConnector
     {
         /// <summary>
