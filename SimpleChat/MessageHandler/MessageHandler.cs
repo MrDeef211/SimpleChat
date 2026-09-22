@@ -3,7 +3,7 @@ using SimpleChat.MessageService;
 
 namespace SimpleChat.MessageHandler
 {
-    internal class MessageHandler : IMessageHandler
+    public class MessageHandler : IMessageHandler
     {
         public event EventHandler<MessageReceivedEventArgs> MessageReceived;
 

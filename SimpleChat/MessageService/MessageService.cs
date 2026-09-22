@@ -5,7 +5,7 @@ using SimpleChat.Interfaces;
 
 namespace SimpleChat.MessageService
 {
-    internal class MessageService(IConnector connector) : IMessageService, IConnectionService, IDisposable
+    public class MessageService(IConnector connector) : IMessageService, IConnectionService, IDisposable
     {
         public event EventHandler<ReceiveMessageCommand>? MessageReceived;
 

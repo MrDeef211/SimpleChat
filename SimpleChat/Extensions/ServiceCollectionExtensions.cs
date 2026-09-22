@@ -7,14 +7,17 @@ using System.Text.Json;
 
 namespace SimpleChat.Extensions
 {
-    internal static class ServiceCollectionExtensions
+    public static class ServiceCollectionExtensions
     {
         public static IServiceCollection AddChatServices(this IServiceCollection services)
         {
             services.AddSingleton<UserInfo>(provider => GetUserInfo());
 
-            services.AddSingleton<IConnectionService, MessageService.MessageService>();
-            services.AddSingleton<IMessageService, MessageService.MessageService>();
+            services.AddSingleton<MessageService.MessageService>();
+
+            services.AddSingleton<IConnectionService>(sp => sp.GetRequiredService<MessageService.MessageService>());
+            services.AddSingleton<IMessageService>(sp => sp.GetRequiredService<MessageService.MessageService>());
+
             services.AddSingleton<IMessageHandler, MessageHandler.MessageHandler>();
             services.AddSingleton<IMessageFactory, MessageFactory.MessageFactory>();
 

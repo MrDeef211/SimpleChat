@@ -1,12 +1,45 @@
 ﻿<Window x:Class="GUI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:GUI"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="Simple Chat" Height="500" Width="700">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
+        <!-- Панель подключения -->
+        <GroupBox Grid.Row="0" Header="Подключение" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" Margin="5">
+                <TextBlock Text="User ID (Guid):" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox x:Name="TxtUserId" Width="250" Margin="0,0,10,0"/>
+                <TextBlock Text="Имя:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox x:Name="TxtUserName" Width="120" Margin="0,0,10,0"/>
+                <Button x:Name="BtnConnect" Content="Подключиться" Click="BtnConnect_Click" Padding="10,2"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- История сообщений -->
+        <ListBox x:Name="LstMessages" Grid.Row="1" Margin="0,0,0,10" 
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+
+        <!-- Панель отправки -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="Auto" MinWidth="100"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="TxtReceiver" Grid.Column="0" Margin="0,0,5,0" 
+                     ToolTip="ID получателя" Text="Получатель..."/>
+
+            <TextBox x:Name="TxtMessage" Grid.Column="1" Margin="0,0,5,0" 
+                     ToolTip="Текст сообщения" Text="Введите сообщение..."/>
+
+            <Button x:Name="BtnSend" Grid.Column="2" Content="Отправить" 
+                    Click="BtnSend_Click" Padding="15,2"/>
+        </Grid>
     </Grid>
 </Window>

@@ -4,7 +4,7 @@ using Abstractions.DTO;
 namespace SimpleChat.MessageService
 {
     // Для внутреннего использования IConnector, не использовать IConnector напрямую
-    internal interface IMessageService
+    public interface IMessageService
     {
         event EventHandler<ReceiveMessageCommand> MessageReceived;
 

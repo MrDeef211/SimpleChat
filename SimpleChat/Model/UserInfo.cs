@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SimpleChat.Model
 {
-    internal class UserInfo
+    public class UserInfo
     {
         public Guid UserId { get; set; }
 

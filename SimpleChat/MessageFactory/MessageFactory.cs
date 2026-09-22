@@ -9,7 +9,7 @@ using SimpleChat.Model;
 
 namespace SimpleChat.MessageFactory
 {
-    internal class MessageFactory(IMessageService service, UserInfo user) : IMessageFactory
+    public class MessageFactory(IMessageService service, UserInfo user) : IMessageFactory
     {
         public void SendMessage(string message, string receiver)
         {

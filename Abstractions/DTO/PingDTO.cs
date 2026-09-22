@@ -6,7 +6,12 @@ using System.Threading.Tasks;
 
 namespace Abstractions.DTO
 {
-    internal interface IMessageDTO
+    public class PingDTO
     {
+        public Guid Sendler { get; set; }
+
+        public DateTime PingTime { get; set; }
+
+        public string? reason { get; set; }
     }
 }

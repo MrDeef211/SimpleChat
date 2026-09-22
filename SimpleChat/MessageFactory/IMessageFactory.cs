@@ -1,6 +1,6 @@
 ﻿namespace SimpleChat.MessageFactory
 {
-    internal interface IMessageFactory
+    public interface IMessageFactory
     {
         /// <summary>
         /// Формирует сообщения для отправки

@@ -2,7 +2,7 @@
 
 namespace SimpleChat.MessageHandler
 {
-    internal interface IMessageHandler
+    public interface IMessageHandler
     {
         event EventHandler<MessageReceivedEventArgs> MessageReceived;
 
