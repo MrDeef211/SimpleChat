@@ -8,7 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="MessageFactory\" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Abstractions\Abstractions.csproj" />
+    <ProjectReference Include="..\Connector\Connector.csproj" />
   </ItemGroup>
 
 </Project>
