@@ -1,4 +1,4 @@
-﻿namespace SimpleChat.MessageFactory
+﻿namespace SimpleChat.Core.MessageFactory
 {
     public interface IMessageFactory
     {

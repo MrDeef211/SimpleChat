@@ -14,6 +14,7 @@
         {
             Message = message;
             Sender = sendler;
+            Receiver = receiver;
             SendTime = dateTime;
         }
     }

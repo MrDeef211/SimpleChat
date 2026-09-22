@@ -1,9 +1,10 @@
-﻿using SimpleChat.MessageFactory;
-using SimpleChat.MessageHandler;
-using SimpleChat.MessageService;
-using SimpleChat.Model;
+﻿using SimpleChat.Model;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
+using SimpleChat.Core.MessageService;
+using SimpleChat.Core.MessageHandler;
+using SimpleChat.Core.MessageFactory;
+using SimpleChat.Core.UserRegistry;
 
 namespace SimpleChat.Extensions
 {
@@ -13,13 +14,14 @@ namespace SimpleChat.Extensions
         {
             services.AddSingleton<UserInfo>(provider => GetUserInfo());
 
-            services.AddSingleton<MessageService.MessageService>();
+            services.AddSingleton<IUserRegistry, UserRegistry>();
+            services.AddSingleton<MessageService>();
 
-            services.AddSingleton<IConnectionService>(sp => sp.GetRequiredService<MessageService.MessageService>());
-            services.AddSingleton<IMessageService>(sp => sp.GetRequiredService<MessageService.MessageService>());
+            services.AddSingleton<IConnectionService>(sp => sp.GetRequiredService<MessageService>());
+            services.AddSingleton<IMessageService>(sp => sp.GetRequiredService<MessageService>());
 
-            services.AddSingleton<IMessageHandler, MessageHandler.MessageHandler>();
-            services.AddSingleton<IMessageFactory, MessageFactory.MessageFactory>();
+            services.AddSingleton<IMessageHandler, MessageHandler>();
+            services.AddSingleton<IMessageFactory, MessageFactory>();
 
             return services;
         }

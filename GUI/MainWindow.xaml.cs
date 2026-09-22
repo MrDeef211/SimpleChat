@@ -1,7 +1,7 @@
 ﻿using Abstractions.Commands;
-using SimpleChat.MessageFactory;
-using SimpleChat.MessageHandler;
-using SimpleChat.MessageService;
+using SimpleChat.Core.MessageFactory;
+using SimpleChat.Core.MessageHandler;
+using SimpleChat.Core.MessageService;
 using SimpleChat.Model;
 using System;
 using System.Windows;

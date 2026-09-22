@@ -1,7 +1,7 @@
 ﻿using Abstractions.Commands;
-using SimpleChat.MessageService;
+using SimpleChat.Core.MessageService;
 
-namespace SimpleChat.MessageHandler
+namespace SimpleChat.Core.MessageHandler
 {
     public class MessageHandler : IMessageHandler
     {
@@ -14,7 +14,7 @@ namespace SimpleChat.MessageHandler
 
         public void ReceiveMessage(object? sender, ReceiveMessageCommand command)
         {
-            MessageReceived?.Invoke(this, new MessageReceivedEventArgs(command.Message, command.Sendler, command.SendTime));
+            MessageReceived?.Invoke(this, new MessageReceivedEventArgs(command.Message, command.Sender, command.SendTime));
         }
     }
 }

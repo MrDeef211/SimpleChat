@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Abstractions.Commands;
-using SimpleChat.MessageService;
+using SimpleChat.Core.MessageService;
 using SimpleChat.Model;
 
-namespace SimpleChat.MessageFactory
+namespace SimpleChat.Core.MessageFactory
 {
     public class MessageFactory(IMessageService service, UserInfo user) : IMessageFactory
     {

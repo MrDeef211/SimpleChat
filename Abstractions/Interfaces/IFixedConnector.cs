@@ -42,12 +42,18 @@ namespace Abstractions.Interfaces
         /// <summary>
         /// Получить список доступных пользователей в сети
         /// </summary>
+        /// <remarks>
+        /// После получения пинга пользователи отправляют ответный пинг
+        /// </remarks>
         /// <param name="ping"></param>
         void GetUsers(PingDTO ping);
 
         /// <summary>
         /// Получить список доступных пользователей в сети
         /// </summary>
+        /// <remarks>
+        /// После получения пинга пользователи отправляют ответный пинг
+        /// </remarks>
         /// <param name="ping"></param>
         Task GetUsersAsync(PingDTO ping);
 
@@ -77,14 +83,14 @@ namespace Abstractions.Interfaces
         /// Отключится от пользователя
         /// </summary>
         /// <param name="reason"></param>
-        void Disconect(string reason);
+        void Disconnect(Guid address, string reason);
 
         /// <summary>
         /// Отключится от пользователя
         /// </summary>
         /// <param name="reason"></param>
         /// <returns></returns>
-        Task DisconnectAsync(string reason);
+        Task DisconnectAsync(Guid address, string reason);
 
         /// <summary>
         /// Отправить сообщение
