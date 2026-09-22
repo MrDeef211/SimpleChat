@@ -30,6 +30,8 @@ namespace SimpleChat.Core.MessageService
             _connector.MessageReceived += OnConnectorMessageReceived;
         }
 
+        #region Отправка сообщений
+
         public void SendMessage(SendMessageCommand command)
         {
             var receiverId = _registry.GetId(command.Receiver); 
@@ -53,6 +55,10 @@ namespace SimpleChat.Core.MessageService
                 throw new TimeoutException($"Превышено время ожидания отправки ({SendTimeout.TotalSeconds} с).");
             }
         }
+
+        #endregion
+
+        #region Подключение и отключение
 
         public int Connect(string user)
         {
@@ -80,6 +86,10 @@ namespace SimpleChat.Core.MessageService
             await _connector.DisconnectAsync(id, reason).ConfigureAwait(false);
             _registry.Remove(user);
         }
+
+        #endregion
+
+        #region Работа с пользователями
 
         public bool TryRename(string oldName, string newName) => _registry.TryRename(oldName, newName);
 
@@ -132,6 +142,8 @@ namespace SimpleChat.Core.MessageService
 
             return collected.Keys.Select(_registry.GetOrAddName).ToList();
         }
+
+        #endregion
 
         private void OnConnectorMessageReceived(object? sender, MessageDTO dto)
         {
