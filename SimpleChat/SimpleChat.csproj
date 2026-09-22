@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Abstractions\Abstractions.csproj" />
+    <ProjectReference Include="..\Connector\Connector.csproj" />
   </ItemGroup>
 
 </Project>

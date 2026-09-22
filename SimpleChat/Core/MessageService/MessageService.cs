@@ -12,11 +12,17 @@ namespace SimpleChat.Core.MessageService
     {
         public event EventHandler<ReceiveMessageCommand>? MessageReceived;
 
+        public event EventHandler<string>? UserConnected;
+
+        public event EventHandler<string>? UserDisconnected;
+
         private readonly IFixedConnector _connector;
 
         private readonly IUserRegistry _registry;
 
         private readonly Guid _localId;
+
+        private readonly ConcurrentDictionary<string, byte> _connected = new();
 
         private static readonly TimeSpan DiscoveryTimeout = TimeSpan.FromSeconds(2);
 
@@ -64,13 +70,22 @@ namespace SimpleChat.Core.MessageService
         {
             var id = _registry.GetId(user);
             var result = _connector.Connect(id);
+
+            if (result >= 200 && result < 300)
+                MarkConnected(user);
+
             return result;
         }
 
         public async Task<int> ConnectAsync(string user)
         {
             var id = _registry.GetId(user);
-            return await _connector.ConnectAsync(id).ConfigureAwait(false);
+            var result = await _connector.ConnectAsync(id).ConfigureAwait(false);
+
+            if (result >= 200 && result < 300)
+                MarkConnected(user);
+
+            return result;
         }
 
         public void Disconnect(string user, string reason)
@@ -78,6 +93,7 @@ namespace SimpleChat.Core.MessageService
             var id = _registry.GetId(user);
             _connector.Disconnect(id, reason);
             _registry.Remove(user);
+            MarkDisconnected(user);
         }
 
         public async Task DisconnectAsync(string user, string reason)
@@ -85,6 +101,7 @@ namespace SimpleChat.Core.MessageService
             var id = _registry.GetId(user);
             await _connector.DisconnectAsync(id, reason).ConfigureAwait(false);
             _registry.Remove(user);
+            MarkDisconnected(user);
         }
 
         #endregion
@@ -143,6 +160,22 @@ namespace SimpleChat.Core.MessageService
             return collected.Keys.Select(_registry.GetOrAddName).ToList();
         }
 
+        public bool IsConnected(string user) => _connected.ContainsKey(user);
+
+        public IReadOnlyCollection<string> GetConnectedUsers() => _connected.Keys.ToArray();
+
+        private void MarkConnected(string user)
+        {
+            if (_connected.TryAdd(user, 0))
+                UserConnected?.Invoke(this, user);
+        }
+
+        private void MarkDisconnected(string user)
+        {
+            if (_connected.TryRemove(user, out _))
+                UserDisconnected?.Invoke(this, user);
+        }
+
         #endregion
 
         private void OnConnectorMessageReceived(object? sender, MessageDTO dto)
@@ -156,6 +189,7 @@ namespace SimpleChat.Core.MessageService
         {
             _connector.MessageReceived -= OnConnectorMessageReceived;
             MessageReceived = null;
+            _connected.Clear();
         }
 
         private MessageDTO CreateDTO(SendMessageCommand command) =>

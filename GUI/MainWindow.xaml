@@ -33,9 +33,29 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <ListBox x:Name="LstUsers" Grid.Column="0" Height="110"
+                <ListBox x:Name="LstUsers" Grid.Column="0" Height="130"
                          SelectionMode="Single"
-                         MouseDoubleClick="LstUsers_MouseDoubleClick"/>
+                         MouseDoubleClick="LstUsers_MouseDoubleClick">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill" Value="#9E9E9E"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                                    <Setter Property="Fill" Value="#2ECC71"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
                 <StackPanel Grid.Column="1" Margin="8,0,0,0" Width="160">
                     <Button x:Name="BtnRefresh" Content="Обновить" Margin="0,0,0,5"

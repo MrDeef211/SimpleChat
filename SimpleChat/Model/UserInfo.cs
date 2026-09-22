@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace SimpleChat.Model
@@ -12,11 +13,11 @@ namespace SimpleChat.Model
 
         public string LocalName { get; set; }
 
-        public UserInfo(Guid id, string name) 
+        [JsonConstructor]
+        public UserInfo(Guid userId, string localName)
         {
-            UserId = id;
-            LocalName = name;
+            UserId = userId;
+            LocalName = localName;
         }
-
     }
 }

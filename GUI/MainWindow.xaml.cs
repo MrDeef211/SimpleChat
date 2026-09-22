@@ -1,4 +1,5 @@
 ﻿using Abstractions.Commands;
+using GUI.ViewModels;
 using SimpleChat.Core.MessageFactory;
 using SimpleChat.Core.MessageHandler;
 using SimpleChat.Core.MessageService;
@@ -6,6 +7,7 @@ using SimpleChat.Core.UserRegistry;
 using SimpleChat.Model;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -19,6 +21,7 @@ namespace GUI
         private readonly IConnectionService _connectionService;
         private readonly IUserRegistry _userRegistry;
         private readonly UserInfo _userInfo;
+        private readonly ObservableCollection<UserListItem> _users = new();
 
         public MainWindow(
             IMessageFactory messageFactory,
@@ -29,6 +32,8 @@ namespace GUI
         {
             InitializeComponent();
 
+            LstUsers.ItemsSource = _users;
+
             _messageFactory = messageFactory;
             _messageHandler = messageHandler;
             _connectionService = connectionService;
@@ -36,6 +41,9 @@ namespace GUI
             _userInfo = userInfo;
 
             _messageHandler.MessageReceived += OnMessageReceived;
+
+            _connectionService.UserConnected += OnUserConnected;
+            _connectionService.UserDisconnected += OnUserDisconnected;
 
             TxtLocalName.Text = _userInfo.LocalName;
             TxtLocalId.Text = _userInfo.UserId.ToString("N").Substring(0, 8) + "…";
@@ -49,27 +57,55 @@ namespace GUI
 
         private void OnMessageReceived(object? sender, MessageReceivedEventArgs e)
         {
+            var localTime = ToLocal(e.SendTime);
+
             Dispatcher.Invoke(() =>
             {
-                LstMessages.Items.Add($"[{e.SendTime:HH:mm:ss}] {e.Sender}: {e.Message}");
+                LstMessages.Items.Add($"[{localTime:HH:mm:ss}] {e.Sender}: {e.Message}");
                 LstMessages.ScrollIntoView(LstMessages.Items[^1]);
             });
         }
 
+        private void OnUserConnected(object? sender, string name) =>
+        Dispatcher.Invoke(() =>
+        {
+            var item = _users.FirstOrDefault(u => u.Name == name);
+            if (item != null) item.IsConnected = true;
+        });
+
+        private void OnUserDisconnected(object? sender, string name) =>
+        Dispatcher.Invoke(() =>
+        {
+            var item = _users.FirstOrDefault(u => u.Name == name);
+            if (item != null) item.IsConnected = false;
+        });
+
+        /// <summary>
+        /// Безопасно приводит DateTime к локальному времени, даже если Kind был потерян при сериализации.
+        /// </summary>
+        private static DateTime ToLocal(DateTime dt) => dt.Kind switch
+        {
+            DateTimeKind.Local => dt,
+            DateTimeKind.Utc => dt.ToLocalTime(),
+            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc).ToLocalTime()
+        };
+
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             BtnRefresh.IsEnabled = false;
-            string? previouslySelected = LstUsers.SelectedItem as string;
+            string? previouslySelected = (LstUsers.SelectedItem as UserListItem)?.Name;
+
             try
             {
                 List<string> users = await _connectionService.GetUsersAsync();
+                var connected = _connectionService.GetConnectedUsers().ToHashSet();
 
-                LstUsers.Items.Clear();
+                _users.Clear();
                 foreach (var name in users)
-                    LstUsers.Items.Add(name);
+                    _users.Add(new UserListItem(name, connected.Contains(name)));
 
-                if (previouslySelected != null && LstUsers.Items.Contains(previouslySelected))
-                    LstUsers.SelectedItem = previouslySelected;
+                if (previouslySelected != null)
+                    LstUsers.SelectedItem = _users.FirstOrDefault(u => u.Name == previouslySelected);
             }
             catch (Exception ex)
             {
@@ -83,7 +119,7 @@ namespace GUI
 
         private async void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
-            if (LstUsers.SelectedItem is not string user)
+            if (LstUsers.SelectedItem is not UserListItem user)
             {
                 MessageBox.Show("Выберите пользователя в списке.");
                 return;
@@ -92,8 +128,9 @@ namespace GUI
             try
             {
                 BtnConnect.IsEnabled = false;
-                int result = await _connectionService.ConnectAsync(user);
-                MessageBox.Show($"Подключение к '{user}': {result}");
+                int result = await _connectionService.ConnectAsync(user.Name);
+                MessageBox.Show($"Подключение к '{user.Name}': {result}");
+                // Индикатор обновится сам через событие UserConnected.
             }
             catch (Exception ex)
             {
@@ -107,7 +144,7 @@ namespace GUI
 
         private async void BtnDisconnect_Click(object sender, RoutedEventArgs e)
         {
-            if (LstUsers.SelectedItem is not string user)
+            if (LstUsers.SelectedItem is not UserListItem user)
             {
                 MessageBox.Show("Выберите пользователя в списке.");
                 return;
@@ -115,9 +152,9 @@ namespace GUI
 
             try
             {
-                await _connectionService.DisconnectAsync(user, "user requested");
-                LstUsers.Items.Remove(user);
-                if (TxtReceiver.Text == user)
+                await _connectionService.DisconnectAsync(user.Name, "user requested");
+                // Индикатор обновится сам через событие UserDisconnected.
+                if (TxtReceiver.Text == user.Name)
                     TxtReceiver.Clear();
             }
             catch (Exception ex)
@@ -128,36 +165,37 @@ namespace GUI
 
         private void BtnRename_Click(object sender, RoutedEventArgs e)
         {
-            if (LstUsers.SelectedItem is not string oldName)
+            if (LstUsers.SelectedItem is not UserListItem item)
             {
                 MessageBox.Show("Выберите пользователя для переименования.");
                 return;
             }
 
+            string oldName = item.Name;
             string newName = Microsoft.VisualBasic.Interaction.InputBox(
                 $"Новое имя для '{oldName}':", "Переименование", oldName);
 
             if (string.IsNullOrWhiteSpace(newName) || newName == oldName)
                 return;
 
-            if (_connectionService.TryRename(oldName, newName))
-            {
-                int index = LstUsers.Items.IndexOf(oldName);
-                if (index >= 0)
-                {
-                    LstUsers.Items[index] = newName;
-                    LstUsers.SelectedItem = newName;
-                }
-            }
-            else
+            if (!_connectionService.TryRename(oldName, newName))
             {
                 MessageBox.Show("Не удалось переименовать (имя занято или не найдено).");
+                return;
+            }
+
+            int index = _users.IndexOf(item);
+            if (index >= 0)
+            {
+                var renamed = new UserListItem(newName, item.IsConnected);
+                _users[index] = renamed;
+                LstUsers.SelectedItem = renamed;
             }
         }
 
         private async void LstUsers_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (LstUsers.SelectedItem is string)
+            if (LstUsers.SelectedItem is UserListItem)
                 BtnConnect_Click(sender, e);
         }
 

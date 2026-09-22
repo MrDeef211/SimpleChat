@@ -29,6 +29,26 @@ namespace SimpleChat.Core.MessageService
         Task DisconnectAsync(string user, string reason);
 
         /// <summary>
+        /// Подключён ли пользователь в данный момент
+        /// </summary>
+        bool IsConnected(string user);
+
+        /// <summary>
+        /// Список имён, к которым сейчас установлено соединение
+        /// </summary>
+        IReadOnlyCollection<string> GetConnectedUsers();
+
+        /// <summary>
+        /// Пользователь успешно подключён
+        /// </summary>
+        event EventHandler<string>? UserConnected;
+
+        /// <summary>
+        /// Пользователь отключён
+        /// </summary>
+        event EventHandler<string>? UserDisconnected;
+
+        /// <summary>
         /// Обнаружение — возвращает только имена
         /// </summary>
         List<string> GetUsers();
