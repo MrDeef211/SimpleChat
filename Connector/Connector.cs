@@ -13,7 +13,7 @@ using System.Xml.Xsl;
 
 namespace Connector
 {
-    public class Connector : IConnector
+    public class Connector 
     {
         private Socket? _socket;
         private bool _disposed;

@@ -35,7 +35,7 @@ namespace Connector
         public int ErrorCode { get; init; } = 404;
 
         /// <summary>
-        /// Набор «известных в сети» пиров (эмулируют других клиентов)
+        /// Набор «известных в сети» пиров (симулируют других клиентов)
         /// </summary>
         public IReadOnlyCollection<Guid> KnownPeers
         {
