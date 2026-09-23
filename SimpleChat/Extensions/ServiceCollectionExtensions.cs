@@ -12,6 +12,11 @@ namespace SimpleChat.Extensions
 {
     public static class ServiceCollectionExtensions
     {
+        /// <summary>
+        /// Регистрация сервисов и интерфейсов
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
         public static IServiceCollection AddChatServices(this IServiceCollection services)
         {
             services.AddSingleton<UserInfo>(provider => GetUserInfo());

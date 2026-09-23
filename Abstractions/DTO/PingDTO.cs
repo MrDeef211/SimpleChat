@@ -2,6 +2,14 @@
 {
     public class PingDTO
     {
+        /// <summary>
+        /// Сетевой id отправителя
+        /// </summary>
+        /// <remarks>
+        /// Нужен для идентификации пользователя в сети, 
+        /// для обнаружения пользователя по адрессу используются 
+        /// внутренние протоколы реализации IConnector
+        /// </remarks>
         public Guid Sender { get; set; }
 
         public DateTime PingTime { get; set; }

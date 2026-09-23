@@ -1,4 +1,5 @@
-﻿using Abstractions.Commands;
+﻿using System.ComponentModel;
+using Abstractions.Commands;
 using Moq;
 using SimpleChat.Core.MessageHandler;
 using SimpleChat.Core.MessageService;
@@ -16,6 +17,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Конструктор подписывается на событие MessageReceived сервиса")]
         public void Constructor_SubscribesToServiceEvent()
         {
             MessageReceivedEventArgs? received = null;
@@ -28,6 +30,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Полученная команда преобразуется в аргументы события MessageReceivedEventArgs с сохранением полей")]
         public void ReceiveMessage_TranslatesCommandToEventArgs()
         {
             var time = DateTime.UtcNow;
@@ -44,6 +47,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Событие MessageReceived вызывается для всех подписчиков")]
         public void ReceiveMessage_NotifiesAllSubscribers()
         {
             int count = 0;

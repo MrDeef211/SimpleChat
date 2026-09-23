@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.ComponentModel;
 using SimpleChat.Core.UserRegistry;
 
 namespace Testing.CoreTesting
@@ -8,6 +9,7 @@ namespace Testing.CoreTesting
         // ---------- GetOrAddName ----------
 
         [Fact]
+        [Description("Для нового ID генерируется имя с префиксом 'User-'")]
         public void GetOrAddName_NewId_GeneratesNameWithPrefix()
         {
             var registry = new UserRegistry();
@@ -18,6 +20,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Повторный вызов для того же ID возвращает то же имя, количество записей не увеличивается")]
         public void GetOrAddName_SameId_IsIdempotent()
         {
             var registry = new UserRegistry();
@@ -31,6 +34,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Для множества разных ID генерируются уникальные имена")]
         public void GetOrAddName_MultipleIds_GeneratesDistinctNames()
         {
             var registry = new UserRegistry();
@@ -43,6 +47,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("При конкурентных вызовах для одного ID возвращается одинаковое имя")]
         public void GetOrAddName_ConcurrentCalls_ReturnSameName()
         {
             var registry = new UserRegistry();
@@ -57,6 +62,7 @@ namespace Testing.CoreTesting
         // ---------- GetId / TryGet ----------
 
         [Fact]
+        [Description("Для зарегистрированного имени возвращается соответствующий ID")]
         public void GetId_RegisteredName_ReturnsId()
         {
             var registry = new UserRegistry();
@@ -67,6 +73,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Для неизвестного имени выбрасывается KeyNotFoundException с упоминанием имени")]
         public void GetId_UnknownName_ThrowsKeyNotFound()
         {
             var registry = new UserRegistry();
@@ -76,6 +83,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("TryGetId и TryGetName возвращают true и корректные значения для существующих записей, false для отсутствующих")]
         public void TryGetId_And_TryGetName_BehaveAsExpected()
         {
             var registry = new UserRegistry();
@@ -94,6 +102,7 @@ namespace Testing.CoreTesting
         // ---------- Remove ----------
 
         [Fact]
+        [Description("Удаление по имени удаляет запись в обоих направлениях (имя→ID и ID→имя)")]
         public void Remove_ByName_RemovesBothDirections()
         {
             var registry = new UserRegistry();
@@ -107,6 +116,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Удаление по ID удаляет запись в обоих направлениях")]
         public void Remove_ById_RemovesBothDirections()
         {
             var registry = new UserRegistry();
@@ -122,6 +132,7 @@ namespace Testing.CoreTesting
         // ---------- TryRename ----------
 
         [Fact]
+        [Description("Успешное переименование обновляет соответствия в обоих направлениях")]
         public void TryRename_ValidNames_UpdatesBothDirections()
         {
             var registry = new UserRegistry();
@@ -135,6 +146,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("При попытке переименовать в занятое имя возвращается false, исходные записи сохраняются")]
         public void TryRename_TargetTaken_RollsBackAndKeepsBoth()
         {
             var registry = new UserRegistry();
@@ -150,6 +162,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Попытка переименовать неизвестное имя возвращает false")]
         public void TryRename_UnknownOldName_ReturnsFalse()
         {
             var registry = new UserRegistry();

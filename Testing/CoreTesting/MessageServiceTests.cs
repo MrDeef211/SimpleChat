@@ -1,4 +1,5 @@
-﻿using Abstractions.Commands;
+﻿using System.ComponentModel;
+using Abstractions.Commands;
 using Abstractions.DTO;
 using Abstractions.Interfaces;
 using Moq;
@@ -31,6 +32,7 @@ namespace Testing.CoreTesting
         // ================= Connect / Disconnect =================
 
         [Fact]
+        [Description("Успешное подключение (код 200) отмечает пользователя как подключённого и вызывает событие UserConnected")]
         public void Connect_SuccessCode_MarksConnectedAndFiresEvent()
         {
             var peerId = Guid.NewGuid();
@@ -48,6 +50,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("При неуспешном подключении (код 404) пользователь не отмечается подключённым, событие не вызывается")]
         public void Connect_FailureCode_DoesNotMarkOrFire()
         {
             var peerId = Guid.NewGuid();
@@ -63,12 +66,14 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Попытка подключиться к неизвестному имени выбрасывает KeyNotFoundException")]
         public void Connect_UnknownName_Throws()
         {
             Assert.Throws<KeyNotFoundException>(() => _service.Connect("ghost"));
         }
 
         [Fact]
+        [Description("Повторное подключение того же пользователя не вызывает событие UserConnected повторно")]
         public void Connect_Twice_DoesNotFireEventTwice()
         {
             var peerId = Guid.NewGuid();
@@ -85,6 +90,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Отключение отмечает пользователя как отключённого, вызывает событие UserDisconnected, имя в реестре сохраняется")]
         public void Disconnect_MarksDisconnectedAndPreservesRegistryName()
         {
             var peerId = Guid.NewGuid();
@@ -104,6 +110,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Попытка отключить не подключённого пользователя не вызывает событие UserDisconnected")]
         public void Disconnect_WhenNotConnected_DoesNotFire()
         {
             var peerId = Guid.NewGuid();
@@ -118,6 +125,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Асинхронное подключение с успешным кодом отмечает подключение и вызывает событие")]
         public async Task ConnectAsync_SuccessCode_MarksConnectedAndFiresEvent()
         {
             var peerId = Guid.NewGuid();
@@ -135,6 +143,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Список подключённых пользователей корректно отражает подключения и отключения")]
         public void GetConnectedUsers_ReflectsConnectsAndDisconnects()
         {
             var a = Guid.NewGuid();
@@ -157,6 +166,7 @@ namespace Testing.CoreTesting
         // ================= Send =================
 
         [Fact]
+        [Description("Отправка сообщения зарегистрированному получателю вызывает метод Send коннектора с правильными параметрами")]
         public void SendMessage_RegisteredReceiver_CallsConnectorSend()
         {
             var peerId = Guid.NewGuid();
@@ -171,6 +181,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Отправка сообщения неизвестному получателю выбрасывает KeyNotFoundException")]
         public void SendMessage_UnknownReceiver_Throws()
         {
             Assert.Throws<KeyNotFoundException>(() =>
@@ -178,6 +189,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Асинхронная отправка сообщения зарегистрированному получателю вызывает SendAsync коннектора")]
         public async Task SendMessageAsync_RegisteredReceiver_CallsConnectorSendAsync()
         {
             var peerId = Guid.NewGuid();
@@ -194,8 +206,9 @@ namespace Testing.CoreTesting
                 peerId,
                 It.IsAny<CancellationToken>()), Times.Once);
         }
-
+        
         [Fact]
+        [Description("При превышении таймаута асинхронной отправки выбрасывается TimeoutException")]
         public async Task SendMessageAsync_Timeout_ThrowsTimeoutException()
         {
             var peerId = Guid.NewGuid();
@@ -217,6 +230,7 @@ namespace Testing.CoreTesting
         // ================= Входящие сообщения =================
 
         [Fact]
+        [Description("При получении сообщения от известного отправителя событие MessageReceived вызывается с разрешённым именем отправителя")]
         public void MessageReceived_FromKnownSender_RaisesWithResolvedName()
         {
             var peerId = Guid.NewGuid();
@@ -234,6 +248,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("При получении сообщения от неизвестного отправителя он регистрируется в реестре с новым именем")]
         public void MessageReceived_FromUnknownSender_RegistersNewName()
         {
             var peerId = Guid.NewGuid();
@@ -249,6 +264,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Время отправки полученного сообщения сохраняется в UTC")]
         public void MessageReceived_PreservesUtcTime()
         {
             var peerId = Guid.NewGuid();
@@ -269,6 +285,7 @@ namespace Testing.CoreTesting
         // ================= Протокол пинга (новое) =================
 
         [Fact]
+        [Description("Конструктор подписывается на событие PingReceived, входящий пинг регистрирует отправителя в реестре")]
         public void Constructor_SubscribesToPingReceived()
         {
             var peerId = Guid.NewGuid();
@@ -280,6 +297,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Входящий пинг регистрирует отправителя в реестре")]
         public void IncomingPing_RegistersSenderInRegistry()
         {
             var peerId = Guid.NewGuid();
@@ -292,6 +310,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Входящий пинг от самого себя игнорируется, ответ не отправляется, запись в реестр не добавляется")]
         public void IncomingSelfPing_IsIgnored()
         {
             _connector.Raise(c => c.PingReceived += null, _connector.Object,
@@ -302,6 +321,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Входящий пинг с reason='discover' вызывает отправку ответного pong")]
         public async Task IncomingDiscover_TriggersPongResponse()
         {
             var peerId = Guid.NewGuid();
@@ -327,6 +347,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("Входящий пинг с reason='pong' не вызывает ответного действия")]
         public async Task IncomingPong_DoesNotTriggerResponse()
         {
             var peerId = Guid.NewGuid();
@@ -341,6 +362,7 @@ namespace Testing.CoreTesting
         // ================= Discovery =================
 
         [Fact]
+        [Description("GetUsersAsync выполняет широковещательный запрос, собирает имена ответивших, исключая себя")]
         public async Task GetUsersAsync_UsesBroadcast_AndCollectsNamesExcludingSelf()
         {
             var peerA = Guid.NewGuid();
@@ -371,6 +393,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("При отсутствии ответов GetUsersAsync возвращает пустой список")]
         public async Task GetUsersAsync_EmptyNetwork_ReturnsEmptyList()
         {
             _connector
@@ -385,6 +408,7 @@ namespace Testing.CoreTesting
         // ================= Dispose =================
 
         [Fact]
+        [Description("После Dispose события MessageReceived от коннектора больше не обрабатываются")]
         public void Dispose_UnsubscribesFromConnectorMessages()
         {
             var peerId = Guid.NewGuid();
@@ -402,6 +426,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("После Dispose входящие пинги игнорируются, ответ не отправляется")]
         public void Dispose_UnsubscribesFromPings()
         {
             var peerId = Guid.NewGuid();
@@ -415,6 +440,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("После Dispose список подключённых пользователей пуст")]
         public void Dispose_ClearsConnectedState()
         {
             var peerId = Guid.NewGuid();

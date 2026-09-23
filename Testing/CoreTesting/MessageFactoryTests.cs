@@ -1,4 +1,5 @@
-﻿using Abstractions.Commands;
+﻿using System.ComponentModel;
+using Abstractions.Commands;
 using Moq;
 using SimpleChat.Core.MessageFactory;
 using SimpleChat.Core.MessageService;
@@ -18,6 +19,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("SendMessage формирует команду с заполненными полями и вызывает метод SendMessage сервиса")]
         public void SendMessage_CallsServiceWithPopulatedCommand()
         {
             _factory.SendMessage("hello", "Bob");
@@ -30,6 +32,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("SendMessageAsync формирует команду и вызывает асинхронный метод SendMessageAsync сервиса")]
         public async Task SendMessageAsync_CallsServiceWithPopulatedCommand()
         {
             _service
@@ -45,6 +48,7 @@ namespace Testing.CoreTesting
         }
 
         [Fact]
+        [Description("SendMessage устанавливает время отправки в UTC")]
         public void SendMessage_UsesUtcTime()
         {
             DateTime captured = default;
