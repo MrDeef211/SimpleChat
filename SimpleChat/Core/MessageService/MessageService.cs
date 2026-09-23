@@ -34,6 +34,7 @@ namespace SimpleChat.Core.MessageService
             _registry = registry;
             _localId = userInfo.UserId;
             _connector.MessageReceived += OnConnectorMessageReceived;
+            _connector.PingReceived += OnConnectorPingReceived;
         }
 
         #region Отправка сообщений
@@ -121,7 +122,7 @@ namespace SimpleChat.Core.MessageService
             _connector.PingReceived += OnPing;
             try
             {
-                _connector.GetUsers(new PingDTO(_localId, DateTime.UtcNow, "GetUsers"));
+                _connector.Broadcast(new PingDTO(_localId, DateTime.UtcNow, "discover"));
                 Thread.Sleep(DiscoveryTimeout);
             }
             finally
@@ -145,7 +146,7 @@ namespace SimpleChat.Core.MessageService
             _connector.PingReceived += OnPing;
             try
             {
-                await _connector.GetUsersAsync(new PingDTO(_localId, DateTime.UtcNow, "GetUsers"))
+                await _connector.BroadcastAsync(new PingDTO(_localId, DateTime.UtcNow, "discover"))
                                 .ConfigureAwait(false);
                 await Task.Delay(DiscoveryTimeout).ConfigureAwait(false);
             }
@@ -153,7 +154,6 @@ namespace SimpleChat.Core.MessageService
             {
                 _connector.PingReceived -= OnPing;
             }
-
 
             return collected.Keys.Select(_registry.GetOrAddName).ToList();
         }
@@ -183,9 +183,33 @@ namespace SimpleChat.Core.MessageService
             MessageReceived?.Invoke(this, command);
         }
 
+        private void OnConnectorPingReceived(object? sender, PingDTO ping)
+        {
+            if (ping.Sender == _localId) return;
+
+            _registry.GetOrAddName(ping.Sender);
+
+            if (string.Equals(ping.reason, "discover", StringComparison.OrdinalIgnoreCase))
+                _ = RespondToDiscoverAsync(ping.Sender);
+        }
+
+        private async Task RespondToDiscoverAsync(Guid to)
+        {
+            try
+            {
+                var pong = new PingDTO(_localId, DateTime.UtcNow, "pong");
+                await _connector.PingAsync(pong, to).ConfigureAwait(false);
+            }
+            catch
+            {
+
+            }
+        }
+
         public void Dispose()
         {
             _connector.MessageReceived -= OnConnectorMessageReceived;
+            _connector.PingReceived -= OnConnectorPingReceived; 
             MessageReceived = null;
             _connected.Clear();
         }

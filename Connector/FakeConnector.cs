@@ -144,29 +144,26 @@ namespace Connector
         public void Ping(PingDTO ping, Guid receiver)
         {
             Simulate();
-            if (_knownPeers.TryGetValue(receiver, out var peer) && peer.IsOnline)
-                OnPingReceived(new PingDTO(receiver, DateTime.UtcNow, "pong"));
         }
 
         public async Task PingAsync(PingDTO ping, Guid receiver)
         {
             await Task.Delay(Latency).ConfigureAwait(false);
-            if (_knownPeers.TryGetValue(receiver, out var peer) && peer.IsOnline)
-                OnPingReceived(new PingDTO(receiver, DateTime.UtcNow, "pong"));
         }
 
-        public void GetUsers(PingDTO ping)
+        public void Broadcast(PingDTO ping)
         {
             Simulate();
+
             foreach (var peer in _knownPeers.Values.Where(p => p.IsOnline))
-                OnPingReceived(new PingDTO(peer.Id, DateTime.UtcNow, "discover"));
+                OnPingReceived(new PingDTO(peer.Id, DateTime.UtcNow, "pong"));
         }
 
-        public async Task GetUsersAsync(PingDTO ping)
+        public async Task BroadcastAsync(PingDTO ping)
         {
             await Task.Delay(Latency).ConfigureAwait(false);
             foreach (var peer in _knownPeers.Values.Where(p => p.IsOnline))
-                OnPingReceived(new PingDTO(peer.Id, DateTime.UtcNow, "discover"));
+                OnPingReceived(new PingDTO(peer.Id, DateTime.UtcNow, "pong"));
         }
 
         public Task StartReciveAsync(CancellationToken token = default)
