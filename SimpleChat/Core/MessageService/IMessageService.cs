@@ -1,5 +1,4 @@
 ﻿using Abstractions.Commands;
-using Abstractions.DTO;
 
 namespace SimpleChat.Core.MessageService
 {

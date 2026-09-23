@@ -1,16 +1,14 @@
-﻿using Abstractions.Commands;
+﻿using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using Abstractions.Commands;
 using GUI.ViewModels;
 using SimpleChat.Core.MessageFactory;
 using SimpleChat.Core.MessageHandler;
 using SimpleChat.Core.MessageService;
 using SimpleChat.Core.UserRegistry;
 using SimpleChat.Model;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
 
 namespace GUI
 {
@@ -255,7 +253,7 @@ namespace GUI
             finally
             {
                 TxtMessage.Focus();
-                UpdateSendAvailability(); 
+                UpdateSendAvailability();
             }
         }
 

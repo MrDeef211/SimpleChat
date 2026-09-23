@@ -1,23 +1,14 @@
-﻿using SimpleChat.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http.Headers;
+﻿using System.Net;
 using System.Net.Sockets;
-using System.IO;
-using System.Runtime.InteropServices.Marshalling;
 using System.Text;
-using System.Threading.Tasks;
-using System.Net;
-using System.Xml.Xsl;
 
 namespace Connector
 {
-    public class Connector 
+    public class Connector
     {
         private Socket? _socket;
         private bool _disposed;
-    
+
         public Connector()
         {
             _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -79,7 +70,7 @@ namespace Connector
                 return -1;
             }
         }
-        
+
         public void Disconnect(string reason)
         {
             if (_socket == null || _disposed)
@@ -106,7 +97,7 @@ namespace Connector
 
         public async Task DisconnectAsync(string reson)
         {
-            await Task.Run (() => Disconnect(reson));
+            await Task.Run(() => Disconnect(reson));
 
         }
 
@@ -116,7 +107,7 @@ namespace Connector
 
         public int Send(string message)
         {
-            if(_socket == null || _disposed || !_socket.Connected)
+            if (_socket == null || _disposed || !_socket.Connected)
             {
                 return -2; // нет подключения
             }

@@ -1,0 +1,430 @@
+﻿using Abstractions.Commands;
+using Abstractions.DTO;
+using Abstractions.Interfaces;
+using Moq;
+using SimpleChat.Core.MessageService;
+using SimpleChat.Core.UserRegistry;
+using SimpleChat.Model;
+
+namespace Testing.CoreTesting
+{
+    public class MessageServiceTests : IDisposable
+    {
+        private readonly Mock<IFixedConnector> _connector = new();
+        private readonly UserRegistry _registry = new();
+        private readonly UserInfo _user = new(Guid.NewGuid(), "Local");
+        private readonly MessageService _service;
+
+        private static readonly TimeSpan FastDiscovery = TimeSpan.FromMilliseconds(30);
+        private static readonly TimeSpan FastSend = TimeSpan.FromMilliseconds(200);
+
+        public MessageServiceTests()
+        {
+            _service = new MessageService(
+                _connector.Object, _registry, _user,
+                discoveryTimeout: FastDiscovery,
+                sendTimeout: FastSend);
+        }
+
+        public void Dispose() => _service.Dispose();
+
+        // ================= Connect / Disconnect =================
+
+        [Fact]
+        public void Connect_SuccessCode_MarksConnectedAndFiresEvent()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector.Setup(c => c.Connect(peerId)).Returns(200);
+
+            string? firedFor = null;
+            _service.UserConnected += (_, name) => firedFor = name;
+
+            int result = _service.Connect(peerName);
+
+            Assert.Equal(200, result);
+            Assert.True(_service.IsConnected(peerName));
+            Assert.Equal(peerName, firedFor);
+        }
+
+        [Fact]
+        public void Connect_FailureCode_DoesNotMarkOrFire()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector.Setup(c => c.Connect(peerId)).Returns(404);
+
+            bool fired = false;
+            _service.UserConnected += (_, __) => fired = true;
+
+            Assert.Equal(404, _service.Connect(peerName));
+            Assert.False(_service.IsConnected(peerName));
+            Assert.False(fired);
+        }
+
+        [Fact]
+        public void Connect_UnknownName_Throws()
+        {
+            Assert.Throws<KeyNotFoundException>(() => _service.Connect("ghost"));
+        }
+
+        [Fact]
+        public void Connect_Twice_DoesNotFireEventTwice()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector.Setup(c => c.Connect(peerId)).Returns(200);
+
+            int fired = 0;
+            _service.UserConnected += (_, __) => fired++;
+
+            _service.Connect(peerName);
+            _service.Connect(peerName);
+
+            Assert.Equal(1, fired);
+        }
+
+        [Fact]
+        public void Disconnect_MarksDisconnectedAndPreservesRegistryName()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector.Setup(c => c.Connect(peerId)).Returns(200);
+
+            _service.Connect(peerName);
+
+            string? firedFor = null;
+            _service.UserDisconnected += (_, name) => firedFor = name;
+
+            _service.Disconnect(peerName, "bye");
+
+            Assert.False(_service.IsConnected(peerName));
+            Assert.Equal(peerName, firedFor);
+            Assert.Equal(peerId, _registry.GetId(peerName));
+        }
+
+        [Fact]
+        public void Disconnect_WhenNotConnected_DoesNotFire()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+
+            bool fired = false;
+            _service.UserDisconnected += (_, __) => fired = true;
+
+            _service.Disconnect(peerName, "bye");
+
+            Assert.False(fired);
+        }
+
+        [Fact]
+        public async Task ConnectAsync_SuccessCode_MarksConnectedAndFiresEvent()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector
+                .Setup(c => c.ConnectAsync(peerId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(200);
+
+            string? firedFor = null;
+            _service.UserConnected += (_, name) => firedFor = name;
+
+            Assert.Equal(200, await _service.ConnectAsync(peerName));
+            Assert.True(_service.IsConnected(peerName));
+            Assert.Equal(peerName, firedFor);
+        }
+
+        [Fact]
+        public void GetConnectedUsers_ReflectsConnectsAndDisconnects()
+        {
+            var a = Guid.NewGuid();
+            var b = Guid.NewGuid();
+            string nameA = _registry.GetOrAddName(a);
+            string nameB = _registry.GetOrAddName(b);
+            _connector.Setup(c => c.Connect(a)).Returns(200);
+            _connector.Setup(c => c.Connect(b)).Returns(200);
+
+            _service.Connect(nameA);
+            _service.Connect(nameB);
+            Assert.Equal(2, _service.GetConnectedUsers().Count);
+
+            _service.Disconnect(nameA, "bye");
+            var remaining = _service.GetConnectedUsers();
+            Assert.Single(remaining);
+            Assert.Contains(nameB, remaining);
+        }
+
+        // ================= Send =================
+
+        [Fact]
+        public void SendMessage_RegisteredReceiver_CallsConnectorSend()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector.Setup(c => c.Send(It.IsAny<MessageDTO>(), peerId)).Returns(200);
+
+            _service.SendMessage(new SendMessageCommand("hi", _user.UserId, peerName, DateTime.UtcNow));
+
+            _connector.Verify(c => c.Send(
+                It.Is<MessageDTO>(d => d.Message == "hi" && d.Sender == _user.UserId),
+                peerId), Times.Once);
+        }
+
+        [Fact]
+        public void SendMessage_UnknownReceiver_Throws()
+        {
+            Assert.Throws<KeyNotFoundException>(() =>
+                _service.SendMessage(new SendMessageCommand("hi", _user.UserId, "ghost", DateTime.UtcNow)));
+        }
+
+        [Fact]
+        public async Task SendMessageAsync_RegisteredReceiver_CallsConnectorSendAsync()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector
+                .Setup(c => c.SendAsync(It.IsAny<MessageDTO>(), peerId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(200);
+
+            await _service.SendMessageAsync(
+                new SendMessageCommand("hi", _user.UserId, peerName, DateTime.UtcNow));
+
+            _connector.Verify(c => c.SendAsync(
+                It.Is<MessageDTO>(d => d.Message == "hi"),
+                peerId,
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task SendMessageAsync_Timeout_ThrowsTimeoutException()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+
+            _connector
+                .Setup(c => c.SendAsync(It.IsAny<MessageDTO>(), peerId, It.IsAny<CancellationToken>()))
+                .Returns<MessageDTO, Guid, CancellationToken>(async (_, __, ct) =>
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                    return 200;
+                });
+
+            await Assert.ThrowsAsync<TimeoutException>(() =>
+                _service.SendMessageAsync(
+                    new SendMessageCommand("hi", _user.UserId, peerName, DateTime.UtcNow)));
+        }
+
+        // ================= Входящие сообщения =================
+
+        [Fact]
+        public void MessageReceived_FromKnownSender_RaisesWithResolvedName()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+
+            ReceiveMessageCommand? received = null;
+            _service.MessageReceived += (_, c) => received = c;
+
+            _connector.Raise(c => c.MessageReceived += null, _connector.Object,
+                new MessageDTO("hi", peerId, DateTime.UtcNow));
+
+            Assert.NotNull(received);
+            Assert.Equal("hi", received!.Message);
+            Assert.Equal(peerName, received.Sender);
+        }
+
+        [Fact]
+        public void MessageReceived_FromUnknownSender_RegistersNewName()
+        {
+            var peerId = Guid.NewGuid();
+            ReceiveMessageCommand? received = null;
+            _service.MessageReceived += (_, c) => received = c;
+
+            _connector.Raise(c => c.MessageReceived += null, _connector.Object,
+                new MessageDTO("hi", peerId, DateTime.UtcNow));
+
+            Assert.NotNull(received);
+            Assert.StartsWith("User-", received!.Sender);
+            Assert.Equal(peerId, _registry.GetId(received.Sender));
+        }
+
+        [Fact]
+        public void MessageReceived_PreservesUtcTime()
+        {
+            var peerId = Guid.NewGuid();
+            _registry.GetOrAddName(peerId);
+            var time = new DateTime(2026, 9, 22, 10, 30, 0, DateTimeKind.Utc);
+
+            ReceiveMessageCommand? received = null;
+            _service.MessageReceived += (_, c) => received = c;
+
+            _connector.Raise(c => c.MessageReceived += null, _connector.Object,
+                new MessageDTO("hi", peerId, time));
+
+            Assert.NotNull(received);
+            Assert.Equal(time, received!.SendTime);
+            Assert.Equal(DateTimeKind.Utc, received.SendTime.Kind);
+        }
+
+        // ================= Протокол пинга (новое) =================
+
+        [Fact]
+        public void Constructor_SubscribesToPingReceived()
+        {
+            var peerId = Guid.NewGuid();
+
+            _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                new PingDTO(peerId, DateTime.UtcNow, "pong"));
+
+            Assert.True(_registry.TryGetName(peerId, out _));
+        }
+
+        [Fact]
+        public void IncomingPing_RegistersSenderInRegistry()
+        {
+            var peerId = Guid.NewGuid();
+            Assert.False(_registry.TryGetName(peerId, out _));
+
+            _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                new PingDTO(peerId, DateTime.UtcNow, "pong"));
+
+            Assert.True(_registry.TryGetName(peerId, out _));
+        }
+
+        [Fact]
+        public void IncomingSelfPing_IsIgnored()
+        {
+            _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                new PingDTO(_user.UserId, DateTime.UtcNow, "discover"));
+
+            _connector.Verify(c => c.PingAsync(It.IsAny<PingDTO>(), It.IsAny<Guid>()), Times.Never);
+            Assert.False(_registry.TryGetName(_user.UserId, out _));
+        }
+
+        [Fact]
+        public async Task IncomingDiscover_TriggersPongResponse()
+        {
+            var peerId = Guid.NewGuid();
+
+            var responded = new TaskCompletionSource<(PingDTO ping, Guid to)>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _connector
+                .Setup(c => c.PingAsync(It.IsAny<PingDTO>(), It.IsAny<Guid>()))
+                .Returns(Task.CompletedTask)
+                .Callback<PingDTO, Guid>((p, to) => responded.TrySetResult((p, to)));
+
+            _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                new PingDTO(peerId, DateTime.UtcNow, "discover"));
+
+            var completed = await Task.WhenAny(responded.Task, Task.Delay(1000));
+            Assert.Same(responded.Task, completed);
+
+            var (ping, to) = await responded.Task;
+            Assert.Equal("pong", ping.reason);
+            Assert.Equal(_user.UserId, ping.Sender);
+            Assert.Equal(peerId, to);
+        }
+
+        [Fact]
+        public async Task IncomingPong_DoesNotTriggerResponse()
+        {
+            var peerId = Guid.NewGuid();
+
+            _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                new PingDTO(peerId, DateTime.UtcNow, "pong"));
+            await Task.Delay(FastDiscovery);
+
+            _connector.Verify(c => c.PingAsync(It.IsAny<PingDTO>(), It.IsAny<Guid>()), Times.Never);
+        }
+
+        // ================= Discovery =================
+
+        [Fact]
+        public async Task GetUsersAsync_UsesBroadcast_AndCollectsNamesExcludingSelf()
+        {
+            var peerA = Guid.NewGuid();
+            var peerB = Guid.NewGuid();
+
+            _connector
+                .Setup(c => c.BroadcastAsync(It.IsAny<PingDTO>()))
+                .Returns(Task.CompletedTask)
+                .Callback(() =>
+                {
+                    _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                        new PingDTO(peerA, DateTime.UtcNow, "pong"));
+                    _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                        new PingDTO(peerB, DateTime.UtcNow, "pong"));
+                    _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                        new PingDTO(_user.UserId, DateTime.UtcNow, "pong"));
+                });
+
+            List<string> users = await _service.GetUsersAsync();
+
+            _connector.Verify(c => c.BroadcastAsync(
+                It.Is<PingDTO>(p => p.reason == "discover" && p.Sender == _user.UserId)),
+                Times.Once);
+
+            Assert.Equal(2, users.Count);
+            Assert.Contains(users, u => _registry.GetId(u) == peerA);
+            Assert.Contains(users, u => _registry.GetId(u) == peerB);
+        }
+
+        [Fact]
+        public async Task GetUsersAsync_EmptyNetwork_ReturnsEmptyList()
+        {
+            _connector
+                .Setup(c => c.BroadcastAsync(It.IsAny<PingDTO>()))
+                .Returns(Task.CompletedTask);
+
+            var users = await _service.GetUsersAsync();
+
+            Assert.Empty(users);
+        }
+
+        // ================= Dispose =================
+
+        [Fact]
+        public void Dispose_UnsubscribesFromConnectorMessages()
+        {
+            var peerId = Guid.NewGuid();
+            _registry.GetOrAddName(peerId);
+
+            bool raised = false;
+            _service.MessageReceived += (_, __) => raised = true;
+
+            _service.Dispose();
+
+            _connector.Raise(c => c.MessageReceived += null, _connector.Object,
+                new MessageDTO("x", peerId, DateTime.UtcNow));
+
+            Assert.False(raised);
+        }
+
+        [Fact]
+        public void Dispose_UnsubscribesFromPings()
+        {
+            var peerId = Guid.NewGuid();
+            _service.Dispose();
+
+            _connector.Raise(c => c.PingReceived += null, _connector.Object,
+                new PingDTO(peerId, DateTime.UtcNow, "discover"));
+
+            Assert.False(_registry.TryGetName(peerId, out _));
+            _connector.Verify(c => c.PingAsync(It.IsAny<PingDTO>(), It.IsAny<Guid>()), Times.Never);
+        }
+
+        [Fact]
+        public void Dispose_ClearsConnectedState()
+        {
+            var peerId = Guid.NewGuid();
+            string peerName = _registry.GetOrAddName(peerId);
+            _connector.Setup(c => c.Connect(peerId)).Returns(200);
+            _service.Connect(peerName);
+
+            _service.Dispose();
+
+            Assert.Empty(_service.GetConnectedUsers());
+        }
+    }
+}

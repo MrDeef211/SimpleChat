@@ -1,12 +1,12 @@
-﻿using SimpleChat.Model;
-using Microsoft.Extensions.DependencyInjection;
-using System.Text.Json;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Core.MessageHandler;
-using SimpleChat.Core.MessageFactory;
-using SimpleChat.Core.UserRegistry;
+﻿using System.Text.Json;
 using Abstractions.Interfaces;
 using Connector;
+using Microsoft.Extensions.DependencyInjection;
+using SimpleChat.Core.MessageFactory;
+using SimpleChat.Core.MessageHandler;
+using SimpleChat.Core.MessageService;
+using SimpleChat.Core.UserRegistry;
+using SimpleChat.Model;
 
 namespace SimpleChat.Extensions
 {

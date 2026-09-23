@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Abstractions.DTO
+﻿namespace Abstractions.DTO
 {
     public class PingDTO
     {
@@ -14,7 +8,7 @@ namespace Abstractions.DTO
 
         public string? reason { get; set; }
 
-        public PingDTO(Guid sender, DateTime time, string? reason = null) 
+        public PingDTO(Guid sender, DateTime time, string? reason = null)
         {
             Sender = sender;
             PingTime = time;
