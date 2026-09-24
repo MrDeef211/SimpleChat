@@ -4,6 +4,14 @@
     {
         public string Message { get; set; }
 
+        /// <summary>
+        /// Сетевой id отправителя
+        /// </summary>
+        /// <remarks>
+        /// Нужен для идентификации пользователя в сети, 
+        /// для обнаружения пользователя по адрессу используются 
+        /// внутренние протоколы реализации IConnector
+        /// </remarks>
         public Guid Sender { get; set; }
 
         public string Receiver { get; set; }

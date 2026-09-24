@@ -2,13 +2,12 @@
 using Abstractions.Commands;
 using Abstractions.DTO;
 using Abstractions.Interfaces;
-using Microsoft.Win32;
 using SimpleChat.Core.UserRegistry;
 using SimpleChat.Model;
 
 namespace SimpleChat.Core.MessageService
 {
-    public class MessageService : IMessageService, IConnectionService, IDisposable
+    public class MessageService : IMessageService, IConnectionService, IStartableService, IDisposable
     {
         public event EventHandler<ReceiveMessageCommand>? MessageReceived;
 
@@ -24,42 +23,64 @@ namespace SimpleChat.Core.MessageService
 
         private readonly ConcurrentDictionary<string, byte> _connected = new();
 
-        private static readonly TimeSpan DiscoveryTimeout = TimeSpan.FromSeconds(2);
+        private readonly TimeSpan _discoveryTimeout = TimeSpan.FromSeconds(2);
 
-        private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan _sendTimeout = TimeSpan.FromSeconds(5);
 
-        public MessageService(IFixedConnector connector, IUserRegistry registry, UserInfo userInfo)
+        public MessageService(IFixedConnector connector,
+            IUserRegistry registry, UserInfo userInfo,
+            TimeSpan? discoveryTimeout = null,
+            TimeSpan? sendTimeout = null)
         {
             _connector = connector;
             _registry = registry;
             _localId = userInfo.UserId;
+
+            _discoveryTimeout = discoveryTimeout ?? TimeSpan.FromSeconds(2);
+            _sendTimeout = sendTimeout ?? TimeSpan.FromSeconds(5);
+
             _connector.MessageReceived += OnConnectorMessageReceived;
             _connector.PingReceived += OnConnectorPingReceived;
+
         }
+
+        #region Запуск конектора
+
+        public async Task StartAsync(CancellationToken token = default)
+        {
+            await _connector.StartReciveAsync(token).ConfigureAwait(false);
+        }
+
+        public Task StopAsync(CancellationToken token = default)
+        {
+            return _connector.StopReciveAsync();
+        }
+
+        #endregion
 
         #region Отправка сообщений
 
         public void SendMessage(SendMessageCommand command)
         {
-            var receiverId = _registry.GetId(command.Receiver); 
+            var receiverId = _registry.GetId(command.Receiver);
             var dto = CreateDTO(command);
             var task = Task.Run(() => _connector.Send(dto, receiverId));
-            if (!task.Wait(SendTimeout))
-                throw new TimeoutException($"Превышено время ожидания отправки ({SendTimeout.TotalSeconds} с).");
+            if (!task.Wait(_sendTimeout))
+                throw new TimeoutException($"Превышено время ожидания отправки ({_sendTimeout.TotalSeconds} с).");
             task.GetAwaiter().GetResult();
         }
 
         public async Task SendMessageAsync(SendMessageCommand command)
         {
             var receiverId = _registry.GetId(command.Receiver);
-            using var cts = new CancellationTokenSource(SendTimeout);
+            using var cts = new CancellationTokenSource(_sendTimeout);
             try
             {
                 await _connector.SendAsync(CreateDTO(command), receiverId, cts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
-                throw new TimeoutException($"Превышено время ожидания отправки ({SendTimeout.TotalSeconds} с).");
+                throw new TimeoutException($"Превышено время ожидания отправки ({_sendTimeout.TotalSeconds} с).");
             }
         }
 
@@ -123,7 +144,7 @@ namespace SimpleChat.Core.MessageService
             try
             {
                 _connector.Broadcast(new PingDTO(_localId, DateTime.UtcNow, "discover"));
-                Thread.Sleep(DiscoveryTimeout);
+                Thread.Sleep(_discoveryTimeout);
             }
             finally
             {
@@ -148,7 +169,7 @@ namespace SimpleChat.Core.MessageService
             {
                 await _connector.BroadcastAsync(new PingDTO(_localId, DateTime.UtcNow, "discover"))
                                 .ConfigureAwait(false);
-                await Task.Delay(DiscoveryTimeout).ConfigureAwait(false);
+                await Task.Delay(_discoveryTimeout).ConfigureAwait(false);
             }
             finally
             {
@@ -175,6 +196,8 @@ namespace SimpleChat.Core.MessageService
         }
 
         #endregion
+
+        #region Приём сообщений
 
         private void OnConnectorMessageReceived(object? sender, MessageDTO dto)
         {
@@ -206,10 +229,12 @@ namespace SimpleChat.Core.MessageService
             }
         }
 
+        #endregion
+
         public void Dispose()
         {
             _connector.MessageReceived -= OnConnectorMessageReceived;
-            _connector.PingReceived -= OnConnectorPingReceived; 
+            _connector.PingReceived -= OnConnectorPingReceived;
             MessageReceived = null;
             _connected.Clear();
         }

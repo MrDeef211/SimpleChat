@@ -14,9 +14,10 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Xml.Xsl;
 
+
 namespace Connector
 {
-    public class Connector : IConnector
+    public class Connector
     {
         // Словарь активных сокетов подключенных узлов
         private readonly ConcurrentDictionary<Guid, Socket> _activeConnections = new();
