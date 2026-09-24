@@ -12,4 +12,10 @@
     <ProjectReference Include="..\SimpleChat\SimpleChat.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+  	<None Update="startup.json">
+  		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  	</None>
+  </ItemGroup>
+
 </Project>
