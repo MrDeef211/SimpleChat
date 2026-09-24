@@ -5,13 +5,14 @@ using Abstractions.Interfaces;
 using Moq;
 using SimpleChat.Core.MessageService;
 using SimpleChat.Core.UserRegistry;
+using SimpleChat.Interfaces;
 using SimpleChat.Model;
 
 namespace Testing.CoreTesting
 {
     public class MessageServiceTests : IDisposable
     {
-        private readonly Mock<IFixedConnector> _connector = new();
+        private readonly Mock<IConnector> _connector = new();
         private readonly UserRegistry _registry = new();
         private readonly UserInfo _user = new(Guid.NewGuid(), "Local");
         private readonly MessageService _service;

@@ -1,23 +1,15 @@
-﻿using Abstractions.DTO;
-using SimpleChat.Interfaces;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Sockets;
-using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
-using System.Xml.Xsl;
+using Abstractions.DTO;
+using SimpleChat.Interfaces;
 
 
 namespace Connector
 {
-    public class Connector
+    public class Connector : IConnector
     {
         // Словарь активных сокетов подключенных узлов
         private readonly ConcurrentDictionary<Guid, Socket> _activeConnections = new();
@@ -195,11 +187,11 @@ namespace Connector
 
         public void Disconnect(Guid address, string reason)
         {
-            if(_activeConnections.TryRemove(address, out var socket))
+            if (_activeConnections.TryRemove(address, out var socket))
             {
                 try
                 {
-                    if(socket.Connected)
+                    if (socket.Connected)
                     {
                         socket.Shutdown(SocketShutdown.Both);
                     }
@@ -247,10 +239,10 @@ namespace Connector
 
                 _receiveCts?.Cancel();
                 _receiveCts?.Dispose();
-                _receiveCts= null;
+                _receiveCts = null;
                 _isReceiving = false;
             }
-            
+
             return Task.CompletedTask;
         }
 
@@ -266,7 +258,7 @@ namespace Connector
                     {
                         readTasks.Add(ReadFromSocketInternalAsync(pair.Key, pair.Value, token));
                     }
-                    
+
                     if (readTasks.Count == 0)
                     {
                         await Task.Delay(100, token).ConfigureAwait(false);

@@ -3,6 +3,7 @@ using Abstractions.Commands;
 using Abstractions.DTO;
 using Abstractions.Interfaces;
 using SimpleChat.Core.UserRegistry;
+using SimpleChat.Interfaces;
 using SimpleChat.Model;
 
 namespace SimpleChat.Core.MessageService
@@ -15,7 +16,7 @@ namespace SimpleChat.Core.MessageService
 
         public event EventHandler<string>? UserDisconnected;
 
-        private readonly IFixedConnector _connector;
+        private readonly IConnector _connector;
 
         private readonly IUserRegistry _registry;
 
@@ -27,7 +28,7 @@ namespace SimpleChat.Core.MessageService
 
         private readonly TimeSpan _sendTimeout = TimeSpan.FromSeconds(5);
 
-        public MessageService(IFixedConnector connector,
+        public MessageService(IConnector connector,
             IUserRegistry registry, UserInfo userInfo,
             TimeSpan? discoveryTimeout = null,
             TimeSpan? sendTimeout = null)

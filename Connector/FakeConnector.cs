@@ -1,10 +1,11 @@
 ﻿using System.Collections.Concurrent;
 using Abstractions.DTO;
 using Abstractions.Interfaces;
+using SimpleChat.Interfaces;
 
 namespace Connector
 {
-    public class FakeConnector : IFixedConnector, IDisposable
+    public class FakeConnector : IConnector, IDisposable
     {
         public event EventHandler<MessageDTO>? MessageReceived;
         public event EventHandler<PingDTO>? PingReceived;

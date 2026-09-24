@@ -5,6 +5,7 @@ using Connector;
 using Moq;
 using SimpleChat.Core.MessageService;
 using SimpleChat.Core.UserRegistry;
+using SimpleChat.Interfaces;
 using SimpleChat.Model;
 
 namespace Testing.ConnectrorTesting
@@ -71,8 +72,8 @@ namespace Testing.ConnectrorTesting
             var regA = new UserRegistry();
             var regB = new UserRegistry();
 
-            var connA = new Mock<IFixedConnector>();
-            var connB = new Mock<IFixedConnector>();
+            var connA = new Mock<IConnector>();
+            var connB = new Mock<IConnector>();
 
             var svcA = new MessageService(connA.Object, regA, new UserInfo(peerA, "A"),
                 discoveryTimeout: TimeSpan.FromMilliseconds(30),
