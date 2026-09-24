@@ -11,6 +11,8 @@ namespace GUI
     /// </summary>
     public partial class App : Application
     {
+        private IServiceCollection _services;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -25,13 +27,13 @@ namespace GUI
                 Console.WriteLine($"[{System.DateTime.Now:HH:mm:ss}] Приложение запущено.");
             }
 
-            var services = new ServiceCollection();
+            _services = new ServiceCollection();
 
-            services.AddChatServices();
+            _services.AddChatServices();
 
-            services.AddSingleton<MainWindow>();
+            _services.AddSingleton<MainWindow>();
 
-            var serviceProvider = services.BuildServiceProvider();
+            var serviceProvider = _services.BuildServiceProvider();
 
             AppDomain.CurrentDomain.UnhandledException += (_, args) =>
                 Console.WriteLine($"[UNHANDLED] {args.ExceptionObject}");   
@@ -44,6 +46,7 @@ namespace GUI
 
         protected override void OnExit(ExitEventArgs e)
         {
+            _services.DeleteChatService();
             ConsoleHelper.Detach();
             base.OnExit(e);
         }

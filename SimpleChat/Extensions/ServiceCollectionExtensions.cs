@@ -44,11 +44,27 @@ namespace SimpleChat.Extensions
 
             services.AddSingleton<IConnectionService>(sp => sp.GetRequiredService<MessageService>());
             services.AddSingleton<IMessageService>(sp => sp.GetRequiredService<MessageService>());
+            services.AddSingleton<IStartableService>(sp => sp.GetRequiredService<MessageService>());
 
             services.AddSingleton<IMessageHandler, MessageHandler>();
             services.AddSingleton<IMessageFactory, MessageFactory>();
 
+            var provider = services.BuildServiceProvider();
+
+            var startables = provider.GetServices<IStartableService>();
+            foreach (var s in startables)
+                s.StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+
             return services;
+        }
+
+        public static void DeleteChatService(this IServiceCollection services)
+        {
+            var provider = services.BuildServiceProvider();
+
+            var startables = provider.GetServices<IStartableService>();
+            foreach (var s in startables)
+                s.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
 
         private static UserInfo GetUserInfo()

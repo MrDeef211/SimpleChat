@@ -7,7 +7,7 @@ using SimpleChat.Model;
 
 namespace SimpleChat.Core.MessageService
 {
-    public class MessageService : IMessageService, IConnectionService, IDisposable
+    public class MessageService : IMessageService, IConnectionService, IStartableService, IDisposable
     {
         public event EventHandler<ReceiveMessageCommand>? MessageReceived;
 
@@ -41,7 +41,22 @@ namespace SimpleChat.Core.MessageService
 
             _connector.MessageReceived += OnConnectorMessageReceived;
             _connector.PingReceived += OnConnectorPingReceived;
+
         }
+
+        #region Запуск конектора
+
+        public async Task StartAsync(CancellationToken token = default)
+        {
+            await _connector.StartReciveAsync(token).ConfigureAwait(false);
+        }
+
+        public Task StopAsync(CancellationToken token = default)
+        {
+            return _connector.StopReciveAsync();
+        }
+
+        #endregion
 
         #region Отправка сообщений
 
@@ -182,6 +197,8 @@ namespace SimpleChat.Core.MessageService
 
         #endregion
 
+        #region Приём сообщений
+
         private void OnConnectorMessageReceived(object? sender, MessageDTO dto)
         {
             var senderName = _registry.GetOrAddName(dto.Sender);
@@ -211,6 +228,8 @@ namespace SimpleChat.Core.MessageService
 
             }
         }
+
+        #endregion
 
         public void Dispose()
         {
