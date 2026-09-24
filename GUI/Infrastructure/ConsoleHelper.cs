@@ -16,6 +16,12 @@ namespace GUI.Infrastructure
         private static extern bool FreeConsole();
 
         [DllImport("kernel32.dll")]
+        private static extern bool SetConsoleOutputCP(uint wCodePageID);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool SetConsoleCP(uint wCodePageID);
+
+        [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
 
         [DllImport("user32.dll")]
@@ -24,10 +30,18 @@ namespace GUI.Infrastructure
         private const int SW_HIDE = 0;
         private const int SW_SHOW = 5;
 
+        private const uint CP_UTF8 = 65001;
+
         public static void Attach()
         {
             if (GetConsoleWindow() != IntPtr.Zero) return;
             if (!AllocConsole()) return;
+
+            SetConsoleOutputCP(CP_UTF8);
+            SetConsoleCP(CP_UTF8);
+
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Console.InputEncoding = System.Text.Encoding.UTF8;
 
             var stdout = Console.OpenStandardOutput();
             Console.SetOut(new StreamWriter(stdout) { AutoFlush = true });

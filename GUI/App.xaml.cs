@@ -2,7 +2,7 @@
 using GUI.Configuration;
 using GUI.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using SimpleChat.Extensions;
+using SimpleChat.ChatApplication;
 
 namespace GUI
 {
@@ -11,9 +11,9 @@ namespace GUI
     /// </summary>
     public partial class App : Application
     {
-        private IServiceCollection _services;
+        private ChatApplication? _chat;
 
-        protected override void OnStartup(StartupEventArgs e)
+        protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
@@ -21,33 +21,40 @@ namespace GUI
             if (settings.LaunchConsole)
             {
                 ConsoleHelper.Attach();
-                if (settings.HideConsoleOnStart)
-                    ConsoleHelper.Hide();
-
-                Console.WriteLine($"[{System.DateTime.Now:HH:mm:ss}] Приложение запущено.");
+                if (settings.HideConsoleOnStart) ConsoleHelper.Hide();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Приложение запущено.");
             }
 
-            _services = new ServiceCollection();
-
-            _services.AddChatServices();
-
-            _services.AddSingleton<MainWindow>();
-
-            var serviceProvider = _services.BuildServiceProvider();
-
             AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-                Console.WriteLine($"[UNHANDLED] {args.ExceptionObject}");   
+                Console.WriteLine($"[UNHANDLED] {args.ExceptionObject}");
             DispatcherUnhandledException += (_, args) =>
                 Console.WriteLine($"[DISPATCHER]  {args.Exception}");
 
-            var mainWindow = serviceProvider.GetRequiredService<MainWindow>();
-            mainWindow.Show();
+            try
+            {
+                _chat = await ChatApplication.StartAsync(services =>
+                {
+                    services.AddSingleton<MainWindow>();
+                });
+
+                _chat.Services.GetRequiredService<MainWindow>().Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не удалось запустить приложение: {ex.Message}",
+                                "Ошибка запуска",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown(1);
+            }
         }
 
-        protected override void OnExit(ExitEventArgs e)
+        protected override async void OnExit(ExitEventArgs e)
         {
-            _services.DeleteChatService();
-            ConsoleHelper.Detach();
+            if (_chat is not null)
+            {
+                try { await _chat.DisposeAsync(); }
+                catch (Exception ex) { Console.WriteLine($"[EXIT] {ex}"); }
+            }
             base.OnExit(e);
         }
     }
