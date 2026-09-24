@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Concurrent;
 using Abstractions.DTO;
 using Abstractions.Interfaces;
 
@@ -35,7 +30,7 @@ namespace Connector
         public int ErrorCode { get; init; } = 404;
 
         /// <summary>
-        /// Набор «известных в сети» пиров (эмулируют других клиентов)
+        /// Набор «известных в сети» пиров (симулируют других клиентов)
         /// </summary>
         public IReadOnlyCollection<Guid> KnownPeers
         {
@@ -203,7 +198,7 @@ namespace Connector
                     OnMessageReceived(new MessageDTO(text, sender, DateTime.UtcNow));
                 }
             }
-            catch (OperationCanceledException) { /* штатное завершение */ }
+            catch (OperationCanceledException) { }
         }
 
         private void Simulate()
