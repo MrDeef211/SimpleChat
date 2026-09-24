@@ -1,16 +1,14 @@
-﻿using Abstractions.Commands;
+﻿using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using Abstractions.Commands;
 using GUI.ViewModels;
 using SimpleChat.Core.MessageFactory;
 using SimpleChat.Core.MessageHandler;
 using SimpleChat.Core.MessageService;
 using SimpleChat.Core.UserRegistry;
 using SimpleChat.Model;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
 
 namespace GUI
 {
@@ -19,7 +17,6 @@ namespace GUI
         private readonly IMessageFactory _messageFactory;
         private readonly IMessageHandler _messageHandler;
         private readonly IConnectionService _connectionService;
-        private readonly IUserRegistry _userRegistry;
         private readonly UserInfo _userInfo;
         private readonly ObservableCollection<UserListItem> _users = new();
 
@@ -27,7 +24,6 @@ namespace GUI
             IMessageFactory messageFactory,
             IMessageHandler messageHandler,
             IConnectionService connectionService,
-            IUserRegistry userRegistry,
             UserInfo userInfo)
         {
             InitializeComponent();
@@ -35,7 +31,6 @@ namespace GUI
             _messageFactory = messageFactory;
             _messageHandler = messageHandler;
             _connectionService = connectionService;
-            _userRegistry = userRegistry;
             _userInfo = userInfo;
 
             _messageHandler.MessageReceived += OnMessageReceived;
@@ -92,9 +87,6 @@ namespace GUI
                 UpdateSendAvailability();
             });
 
-        /// <summary>
-        /// Безопасно приводит DateTime к локальному времени, даже если Kind был потерян при сериализации.
-        /// </summary>
         private static DateTime ToLocal(DateTime dt) => dt.Kind switch
         {
             DateTimeKind.Local => dt,
@@ -255,7 +247,7 @@ namespace GUI
             finally
             {
                 TxtMessage.Focus();
-                UpdateSendAvailability(); 
+                UpdateSendAvailability();
             }
         }
 
