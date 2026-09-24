@@ -198,7 +198,7 @@ namespace Connector
                     OnMessageReceived(new MessageDTO(text, sender, DateTime.UtcNow));
                 }
             }
-            catch (OperationCanceledException) { /* штатное завершение */ }
+            catch (OperationCanceledException) { }
         }
 
         private void Simulate()
