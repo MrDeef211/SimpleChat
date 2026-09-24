@@ -1,17 +1,22 @@
-﻿using SimpleChat.Model;
-using Microsoft.Extensions.DependencyInjection;
-using System.Text.Json;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Core.MessageHandler;
-using SimpleChat.Core.MessageFactory;
-using SimpleChat.Core.UserRegistry;
+﻿using System.Text.Json;
 using Abstractions.Interfaces;
 using Connector;
+using Microsoft.Extensions.DependencyInjection;
+using SimpleChat.Core.MessageFactory;
+using SimpleChat.Core.MessageHandler;
+using SimpleChat.Core.MessageService;
+using SimpleChat.Core.UserRegistry;
+using SimpleChat.Model;
 
 namespace SimpleChat.Extensions
 {
     public static class ServiceCollectionExtensions
     {
+        /// <summary>
+        /// Регистрация сервисов и интерфейсов
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
         public static IServiceCollection AddChatServices(this IServiceCollection services)
         {
             services.AddSingleton<UserInfo>(provider => GetUserInfo());
@@ -23,6 +28,7 @@ namespace SimpleChat.Extensions
                     Guid.Parse("11111111-1111-1111-1111-111111111111"),
                     Guid.Parse("22222222-2222-2222-2222-222222222222"),
                     Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                    Guid.Parse("44444444-4444-4444-4444-444444444444"),
                 };
 
                 return new FakeConnector
@@ -39,6 +45,7 @@ namespace SimpleChat.Extensions
 
             services.AddSingleton<IConnectionService>(sp => sp.GetRequiredService<MessageService>());
             services.AddSingleton<IMessageService>(sp => sp.GetRequiredService<MessageService>());
+            services.AddSingleton<IStartableService>(sp => sp.GetRequiredService<MessageService>());
 
             services.AddSingleton<IMessageHandler, MessageHandler>();
             services.AddSingleton<IMessageFactory, MessageFactory>();

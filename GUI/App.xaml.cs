@@ -1,8 +1,8 @@
-﻿using System.Configuration;
-using System.Data;
-using System.Windows;
+﻿using System.Windows;
+using GUI.Configuration;
+using GUI.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using SimpleChat.Extensions;
+using SimpleChat.ChatApplication;
 
 namespace GUI
 {
@@ -11,20 +11,51 @@ namespace GUI
     /// </summary>
     public partial class App : Application
     {
-        protected override void OnStartup(StartupEventArgs e)
+        private ChatApplication? _chat;
+
+        protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
-            var services = new ServiceCollection();
+            var settings = StartupSettings.Load();
+            if (settings.LaunchConsole)
+            {
+                ConsoleHelper.Attach();
+                if (settings.HideConsoleOnStart) ConsoleHelper.Hide();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Приложение запущено.");
+            }
 
-            services.AddChatServices();
+            AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+                Console.WriteLine($"[UNHANDLED] {args.ExceptionObject}");
+            DispatcherUnhandledException += (_, args) =>
+                Console.WriteLine($"[DISPATCHER]  {args.Exception}");
 
-            services.AddSingleton<MainWindow>();
+            try
+            {
+                _chat = await ChatApplication.StartAsync(services =>
+                {
+                    services.AddSingleton<MainWindow>();
+                });
 
-            var serviceProvider = services.BuildServiceProvider();
+                _chat.Services.GetRequiredService<MainWindow>().Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не удалось запустить приложение: {ex.Message}",
+                                "Ошибка запуска",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown(1);
+            }
+        }
 
-            var mainWindow = serviceProvider.GetRequiredService<MainWindow>();
-            mainWindow.Show();
+        protected override async void OnExit(ExitEventArgs e)
+        {
+            if (_chat is not null)
+            {
+                try { await _chat.DisposeAsync(); }
+                catch (Exception ex) { Console.WriteLine($"[EXIT] {ex}"); }
+            }
+            base.OnExit(e);
         }
     }
 

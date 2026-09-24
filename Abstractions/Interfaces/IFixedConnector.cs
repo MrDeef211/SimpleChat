@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Abstractions.DTO;
+﻿using Abstractions.DTO;
 
 namespace Abstractions.Interfaces
 {
