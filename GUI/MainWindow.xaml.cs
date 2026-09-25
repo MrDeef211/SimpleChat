@@ -3,12 +3,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Abstractions.Commands;
-using GUI.ViewModels;
 using Abstractions.Core.MessageFactory;
 using Abstractions.Core.MessageHandler;
 using Abstractions.Core.MessageService;
-using Abstractions.Core.UserRegistry;
 using Abstractions.Model;
+using GUI.ViewModels;
 
 namespace GUI
 {

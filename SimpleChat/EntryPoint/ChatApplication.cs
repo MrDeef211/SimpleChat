@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Abstractions.Core.MessageService;
+﻿using Abstractions.Core.MessageService;
 using Abstractions.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Abstractions.ChatApplication
 {
@@ -16,9 +16,9 @@ namespace Abstractions.ChatApplication
         public IServiceProvider Services => _provider;
 
         /// <summary>
-        /// Собирает контейнер, запускает все долгоживущие сервисы.
+        /// Собирает контейнер, запускает все долгоживущие сервисы
         /// </summary>
-        /// <param name="configure">Дополнительная настройка (например, регистрация главного окна).</param>
+        /// <param name="configure">Дополнительная настройка (например, регистрация главного окна)</param>
         public static async Task<ChatApplication> StartAsync(
             Action<IServiceCollection>? configure = null,
             CancellationToken token = default)

@@ -58,7 +58,7 @@
         Task<List<string>> GetUsersAsync();
 
         /// <summary>
-        /// Необязательное переименование для UI
+        /// Ручное переименование например для UI
         /// </summary>
         bool TryRename(string oldName, string newName);
     }

@@ -1,16 +1,12 @@
-﻿using System.Net;
-using System.Text.Json;
-using Connector.Configuration;
-using Connector.Extensions;
-using Connector.PeerDirectory;
-using Connector.PeerDiscovery;
-using Microsoft.Extensions.DependencyInjection;
+﻿using System.Text.Json;
 using Abstractions.Core.MessageFactory;
 using Abstractions.Core.MessageHandler;
 using Abstractions.Core.MessageService;
 using Abstractions.Core.UserRegistry;
-using Abstractions.Interfaces;
 using Abstractions.Model;
+using Connector.Configuration;
+using Connector.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Abstractions.Extensions
 {

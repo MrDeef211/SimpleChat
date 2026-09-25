@@ -1,8 +1,8 @@
 ﻿using System.Windows;
+using Abstractions.ChatApplication;
 using GUI.Configuration;
 using GUI.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Abstractions.ChatApplication;
 
 namespace GUI
 {

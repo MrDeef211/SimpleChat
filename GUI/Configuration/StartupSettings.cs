@@ -11,7 +11,7 @@ namespace GUI.Configuration
         public static StartupSettings Load(string path = "startup.json")
         {
             if (!File.Exists(path))
-                return new StartupSettings();   
+                return new StartupSettings();
 
             var json = File.ReadAllText(path);
             return JsonSerializer.Deserialize<StartupSettings>(json)

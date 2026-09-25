@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Abstractions.Commands;
-using Abstractions.DTO;
 using Abstractions.Core.UserRegistry;
+using Abstractions.DTO;
 using Abstractions.Interfaces;
 using Abstractions.Model;
 
@@ -43,7 +43,6 @@ namespace Abstractions.Core.MessageService
 
             _connector.MessageReceived += OnConnectorMessageReceived;
             _connector.PeerDisconnected += OnConnectorPeerDisconnected;
-
         }
 
         #region Запуск конектора
