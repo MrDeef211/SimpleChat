@@ -16,11 +16,11 @@
 
         public DateTime SendTime { get; set; }
 
-        public MessageDTO(string message, Guid sendler, DateTime dateTime)
+        public MessageDTO(string message, Guid sender, DateTime sendTime)
         {
             Message = message;
-            Sender = sendler;
-            SendTime = dateTime;
+            Sender = sender;
+            SendTime = sendTime;
         }
 
     }

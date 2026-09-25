@@ -321,7 +321,6 @@ namespace Connector
         {
             try
             {
-                // Читаем первый пакет — обязан быть Hello.
                 var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
 
                 if (packetType != HelloPacketType)
@@ -423,33 +422,38 @@ namespace Connector
             try
             {
                 if (!socket.Connected || token.IsCancellationRequested) return;
-
-                Console.WriteLine($"[Connector] Read from {connectionGuid:N}, connected={socket.Connected}");
+                Console.WriteLine($"[Connector] Read from {connectionGuid:N}, connected=True");
 
                 var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
                 string json = Encoding.UTF8.GetString(jsonBytes);
+                Console.WriteLine($"[Connector] Received packet type={packetType}, json='{json}'");
 
                 switch (packetType)
                 {
                     case MessagePacketType:
                         var msg = JsonSerializer.Deserialize<MessageDTO>(json);
+                        Console.WriteLine($"[Connector] Deserialized MessageDTO: msg={msg?.Message}, sender={msg?.Sender:N}");
                         if (msg is not null) MessageReceived?.Invoke(this, msg);
                         break;
 
                     case PingPacketType:
                         var ping = JsonSerializer.Deserialize<PingDTO>(json);
+                        Console.WriteLine($"[Connector] Deserialized PingDTO: reason={ping?.reason}");
                         if (ping is not null) PingReceived?.Invoke(this, ping);
                         break;
 
+                    default:
+                        Console.WriteLine($"[Connector] Unknown packet type: {packetType}");
+                        break;
                 }
             }
             catch (OperationCanceledException)
             {
                 Disconnect(connectionGuid, "Соединение закрыто удалённой стороной.");
             }
-            catch
+            catch (Exception ex)
             {
-
+                Console.WriteLine($"[Connector] Read error: {ex}");
             }
         }
 
