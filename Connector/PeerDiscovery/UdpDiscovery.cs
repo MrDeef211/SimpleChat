@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Connector.PeerDiscovery
 {
-    public sealed class UdpDiscovery : IPeerDiscovery
+    public sealed class UdpDiscovery : IPeerDiscovery, IDisposable
     {
         private static readonly IPAddress MulticastAddress = IPAddress.Parse("239.255.42.99");
         private const int DiscoveryPort = 5000;
@@ -15,6 +15,7 @@ namespace Connector.PeerDiscovery
         private readonly Guid _myId;
         private readonly int _myTcpPort;
         private readonly string? _myName;
+        private int _disposed;
 
         private readonly UdpClient _client;
         private readonly ConcurrentDictionary<Guid, DateTime> _lastSeen = new();
@@ -106,9 +107,21 @@ namespace Connector.PeerDiscovery
 
         public void Dispose()
         {
-            StopAsync().GetAwaiter().GetResult();
-            _client.DropMulticastGroup(MulticastAddress);
-            _client.Dispose();
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+
+            try
+            {
+                try { StopAsync().GetAwaiter().GetResult(); } catch { }
+
+                try { _client.DropMulticastGroup(MulticastAddress); } catch { }
+
+                try { _client.Dispose(); } catch { }
+            }
+            catch
+            {
+
+            }
         }
 
         private sealed record HelloPacket(Guid Id, int TcpPort, string? Name, DateTime SentAt);
