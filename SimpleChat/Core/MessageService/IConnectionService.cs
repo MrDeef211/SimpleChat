@@ -3,6 +3,21 @@
     public interface IConnectionService
     {
         /// <summary>
+        /// Пользователь успешно подключён
+        /// </summary>
+        event EventHandler<string>? UserConnected;
+
+        /// <summary>
+        /// Пользователь отключён
+        /// </summary>
+        event EventHandler<string>? UserDisconnected;
+
+        /// <summary>
+        /// Пользователь переименован
+        /// </summary>
+        event EventHandler<(string oldName, string newName)>? UserRenamed;
+
+        /// <summary>
         /// Подключение к ранее обнаруженному пользователю по имени
         /// </summary>
         int Connect(string user);
@@ -31,16 +46,6 @@
         /// Список имён, к которым сейчас установлено соединение
         /// </summary>
         IReadOnlyCollection<string> GetConnectedUsers();
-
-        /// <summary>
-        /// Пользователь успешно подключён
-        /// </summary>
-        event EventHandler<string>? UserConnected;
-
-        /// <summary>
-        /// Пользователь отключён
-        /// </summary>
-        event EventHandler<string>? UserDisconnected;
 
         /// <summary>
         /// Обнаружение — возвращает только имена

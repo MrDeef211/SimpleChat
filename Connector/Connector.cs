@@ -49,12 +49,6 @@ namespace Connector
             _myId = myId;
             _myListeningPort = myListeningPort;
             _discovery = discovery;
-
-            _peers.PeerLost += (_, id) =>
-            {
-                if (_activeConnections.ContainsKey(id))
-                    Disconnect(id, "peer lost by discovery");
-            };
         }
 
         #region Сериализация и отправка пакетов
@@ -195,13 +189,15 @@ namespace Connector
 
         public async Task<int> ConnectAsync(Guid address, CancellationToken token = default)
         {
-
-            if (_activeConnections.TryRemove(address, out var existing))
+            if (_activeConnections.TryGetValue(address, out var existing) && IsSocketAlive(existing))
             {
-                Console.WriteLine($"[Connector] Connect: closing old socket to {address:N}, reconnecting...");
-                try { existing.Shutdown(SocketShutdown.Both); } catch { }
-                try { existing.Close(); } catch { }
-                try { existing.Dispose(); } catch { }
+                Console.WriteLine($"[Connector] Connect: already connected to {address:N}");
+                return 200;
+            }
+
+            if (_activeConnections.TryRemove(address, out var dead))
+            {
+                try { dead.Dispose(); } catch { }
             }
 
             if (!_peers.TryGetEndpoint(address, out var endPoint))
@@ -345,12 +341,17 @@ namespace Connector
                     return;
                 }
 
-                if (_activeConnections.TryRemove(hello.Id, out var oldSocket))
+                if (_activeConnections.TryGetValue(hello.Id, out var existing) && IsSocketAlive(existing))
                 {
-                    Console.WriteLine($"[Connector] Replacing existing connection to {hello.Id:N}");
-                    try { oldSocket.Shutdown(SocketShutdown.Both); } catch { }
-                    try { oldSocket.Close(); } catch { }
-                    try { oldSocket.Dispose(); } catch { }
+                    Console.WriteLine($"[Connector] Duplicate connection from {hello.Id:N}, rejecting");
+                    try { socket.Dispose(); } catch { }
+                    return;
+                }
+
+                if (_activeConnections.TryRemove(hello.Id, out var dead))
+                {
+                    Console.WriteLine($"[Connector] Replacing dead connection to {hello.Id:N}");
+                    try { dead.Dispose(); } catch { }
                 }
 
                 _activeConnections[hello.Id] = socket;

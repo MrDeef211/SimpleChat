@@ -15,6 +15,8 @@ namespace Abstractions.Core.MessageService
 
         public event EventHandler<string>? UserDisconnected;
 
+        public event EventHandler<(string oldName, string newName)>? UserRenamed;
+
         private readonly IConnector _connector;
 
         private readonly IUserRegistry _registry;
@@ -75,21 +77,15 @@ namespace Abstractions.Core.MessageService
         {
             var receiverId = _registry.GetId(command.Receiver);
 
-            if (!_connector.GetKnownPeers().Contains(receiverId) ||
-                !_connected.ContainsKey(command.Receiver))
-            {
-                var connectResult = await _connector.ConnectAsync(receiverId).ConfigureAwait(false);
-                if (connectResult < 200 || connectResult >= 300)
-                    throw new InvalidOperationException($"Не удалось подключиться к '{command.Receiver}' (код {connectResult}).");
-
-                MarkConnected(command.Receiver);
-            }
-
             using var cts = new CancellationTokenSource(_sendTimeout);
             try
             {
                 Console.WriteLine($"[MessageService] SendMessage: receiver='{command.Receiver}', message='{command.Message}'");
-                await _connector.SendAsync(CreateDTO(command), receiverId, cts.Token).ConfigureAwait(false);
+                int code = await _connector.SendAsync(CreateDTO(command), receiverId, cts.Token).ConfigureAwait(false);
+
+                if (code < 200 || code >= 300)
+                    throw new InvalidOperationException(
+                        $"Не удалось отправить сообщение (код {code}). Пользователь не подключён.");
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
@@ -157,7 +153,14 @@ namespace Abstractions.Core.MessageService
             }
         }
 
-        public bool TryRename(string oldName, string newName) => _registry.TryRename(oldName, newName);
+        public bool TryRename(string oldName, string newName)
+        {
+            if (!_registry.TryRename(oldName, newName))
+                return false;
+
+            UserRenamed?.Invoke(this, (oldName, newName));
+            return true;
+        }
 
         public List<string> GetUsers()
         {
@@ -202,6 +205,9 @@ namespace Abstractions.Core.MessageService
         private void OnConnectorMessageReceived(object? sender, MessageDTO dto)
         {
             var senderName = _registry.GetOrAddName(dto.Sender);
+
+            MarkConnected(senderName);
+
             var command = new ReceiveMessageCommand(dto.Message, senderName, dto.SendTime);
             MessageReceived?.Invoke(this, command);
         }

@@ -36,6 +36,7 @@ namespace GUI
             _messageHandler.MessageReceived += OnMessageReceived;
             _connectionService.UserConnected += OnUserConnected;
             _connectionService.UserDisconnected += OnUserDisconnected;
+            _connectionService.UserRenamed += OnUserRenamed;
 
             LstUsers.ItemsSource = _users;
             LstUsers.SelectionChanged += LstUsers_SelectionChanged;
@@ -85,6 +86,20 @@ namespace GUI
                     TxtReceiver.Clear();
 
                 UpdateSendAvailability();
+            });
+
+        private void OnUserRenamed(object? sender, (string oldName, string newName) e) =>
+            Dispatcher.Invoke(() =>
+            {
+                var item = _users.FirstOrDefault(u => u.Name == e.oldName);
+                if (item is null) return;
+
+                int index = _users.IndexOf(item);
+                var renamed = new UserListItem(e.newName, item.IsConnected);
+                _users[index] = renamed;
+
+                if (LstUsers.SelectedItem == item || TxtReceiver.Text == e.oldName)
+                    LstUsers.SelectedItem = renamed;
             });
 
         private static DateTime ToLocal(DateTime dt) => dt.Kind switch
@@ -171,32 +186,16 @@ namespace GUI
 
         private void BtnRename_Click(object sender, RoutedEventArgs e)
         {
-            if (LstUsers.SelectedItem is not UserListItem item)
-            {
-                MessageBox.Show("Выберите пользователя для переименования.");
-                return;
-            }
+            if (LstUsers.SelectedItem is not UserListItem item) return;
 
             string oldName = item.Name;
             string newName = Microsoft.VisualBasic.Interaction.InputBox(
                 $"Новое имя для '{oldName}':", "Переименование", oldName);
 
-            if (string.IsNullOrWhiteSpace(newName) || newName == oldName)
-                return;
+            if (string.IsNullOrWhiteSpace(newName) || newName == oldName) return;
 
             if (!_connectionService.TryRename(oldName, newName))
-            {
                 MessageBox.Show("Не удалось переименовать (имя занято или не найдено).");
-                return;
-            }
-
-            int index = _users.IndexOf(item);
-            if (index >= 0)
-            {
-                var renamed = new UserListItem(newName, item.IsConnected);
-                _users[index] = renamed;
-                LstUsers.SelectedItem = renamed;
-            }
         }
 
         private void LstUsers_MouseDoubleClick(object sender, MouseButtonEventArgs e)
