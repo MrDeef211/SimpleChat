@@ -74,11 +74,22 @@ namespace Abstractions.Core.MessageService
         public async Task SendMessageAsync(SendMessageCommand command)
         {
             var receiverId = _registry.GetId(command.Receiver);
+
+            if (!_connector.GetKnownPeers().Contains(receiverId) ||
+                !_connected.ContainsKey(command.Receiver))
+            {
+                var connectResult = await _connector.ConnectAsync(receiverId).ConfigureAwait(false);
+                if (connectResult < 200 || connectResult >= 300)
+                    throw new InvalidOperationException($"Не удалось подключиться к '{command.Receiver}' (код {connectResult}).");
+
+                MarkConnected(command.Receiver);
+            }
+
             using var cts = new CancellationTokenSource(_sendTimeout);
             try
             {
-                await _connector.SendAsync(CreateDTO(command), receiverId, cts.Token).ConfigureAwait(false);
                 Console.WriteLine($"[MessageService] SendMessage: receiver='{command.Receiver}', message='{command.Message}'");
+                await _connector.SendAsync(CreateDTO(command), receiverId, cts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
@@ -132,10 +143,18 @@ namespace Abstractions.Core.MessageService
 
         private void OnConnectorPeerDisconnected(object? sender, Guid peerId)
         {
+            Console.WriteLine($"[MessageService] PeerDisconnected: {peerId:N}");
             if (peerId == _localId) return;
 
             if (_registry.TryGetName(peerId, out var name))
+            {
+                Console.WriteLine($"[MessageService] MarkDisconnected: {name}");
                 MarkDisconnected(name);
+            }
+            else
+            {
+                Console.WriteLine($"[MessageService] Unknown peer disconnected: {peerId:N}");
+            }
         }
 
         public bool TryRename(string oldName, string newName) => _registry.TryRename(oldName, newName);

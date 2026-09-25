@@ -9,6 +9,8 @@ namespace Connector.PeerDirectory
         private readonly ConcurrentDictionary<Guid, IPEndPoint> _peers = new();
         private readonly IPeerDiscovery? _discovery;
 
+        public event EventHandler<Guid>? PeerLost;
+
         public HybridPeerDirectory(
             IPeerDirectory? staticPeers = null,
             IPeerDiscovery? discovery = null)
@@ -34,8 +36,11 @@ namespace Connector.PeerDirectory
         private void OnDiscovered(object? sender, PeerDiscoveredEventArgs e) =>
             _peers[e.Id] = e.Endpoint;
 
-        private void OnLost(object? sender, Guid id) =>
-            _peers.TryRemove(id, out _);
+        private void OnLost(object? sender, Guid id)
+        {
+            if (_peers.TryRemove(id, out _))
+                PeerLost?.Invoke(this, id);
+        }
 
         public void Dispose()
         {

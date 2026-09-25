@@ -117,11 +117,10 @@ namespace Connector.PeerDiscovery
                     if (bye is not null)
                     {
                         if (bye.Id == _myId) continue;
-                        if (_lastSeen.TryRemove(bye.Id, out _))
-                        {
-                            Console.WriteLine($"[UdpDiscovery] BYE: {bye.Id:N}");
-                            PeerLost?.Invoke(this, bye.Id);
-                        }
+
+                        _lastSeen.TryRemove(bye.Id, out _);   
+                        Console.WriteLine($"[UdpDiscovery] BYE: {bye.Id:N}");
+                        PeerLost?.Invoke(this, bye.Id);    
                         continue;
                     }
                     if (hello is null) continue;
@@ -148,14 +147,18 @@ namespace Connector.PeerDiscovery
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), token).ConfigureAwait(false);
                 var now = DateTime.UtcNow;
+                var removed = 0;
                 foreach (var (id, lastSeen) in _lastSeen)
                 {
                     if (now - lastSeen > PeerTimeout && _lastSeen.TryRemove(id, out _))
                     {
-                        Console.WriteLine($"[UdpDiscovery] LOST: {id:N}");
+                        Console.WriteLine($"[UdpDiscovery] LOST by timeout: {id:N}");
                         PeerLost?.Invoke(this, id);
+                        removed++;
                     }
                 }
+
+                if (removed > 0) Console.WriteLine($"[UdpDiscovery] Cleanup removed {removed} peers");
             }
         }
 

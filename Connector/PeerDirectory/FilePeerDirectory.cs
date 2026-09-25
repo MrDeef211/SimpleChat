@@ -14,6 +14,8 @@ namespace Connector.PeerDirectory
 
         public IReadOnlyCollection<Guid> KnownPeers => _map.Keys.ToArray();
 
+        public event EventHandler<Guid>? PeerLost;
+
         public bool TryGetEndpoint(Guid id, out IPEndPoint endpoint) =>
             _map.TryGetValue(id, out endpoint!);
 

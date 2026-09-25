@@ -49,6 +49,12 @@ namespace Connector
             _myId = myId;
             _myListeningPort = myListeningPort;
             _discovery = discovery;
+
+            _peers.PeerLost += (_, id) =>
+            {
+                if (_activeConnections.ContainsKey(id))
+                    Disconnect(id, "peer lost by discovery");
+            };
         }
 
         #region Сериализация и отправка пакетов
@@ -189,16 +195,19 @@ namespace Connector
 
         public async Task<int> ConnectAsync(Guid address, CancellationToken token = default)
         {
-            if (_activeConnections.TryGetValue(address, out var existingSocket) && existingSocket.Connected)
-            { 
-                Console.WriteLine($"[Connector] Connect: already connected to {address:N}"); 
-                return 200; 
+
+            if (_activeConnections.TryRemove(address, out var existing))
+            {
+                Console.WriteLine($"[Connector] Connect: closing old socket to {address:N}, reconnecting...");
+                try { existing.Shutdown(SocketShutdown.Both); } catch { }
+                try { existing.Close(); } catch { }
+                try { existing.Dispose(); } catch { }
             }
 
             if (!_peers.TryGetEndpoint(address, out var endPoint))
-            { 
-                Console.WriteLine($"[Connector] Connect: no endpoint for {address:N}"); 
-                return 404; 
+            {
+                Console.WriteLine($"[Connector] Connect: no endpoint for {address:N}");
+                return 404;
             }
 
             try
@@ -206,7 +215,6 @@ namespace Connector
                 var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 await socket.ConnectAsync(endPoint, token).ConfigureAwait(false);
 
-                // РУКОПОЖАТИЕ 
                 var hello = SerializePacket(HelloPacketType, new HelloDTO(_myId, _myListeningPort));
                 await socket.SendAsync(hello, SocketFlags.None, token).ConfigureAwait(false);
 
@@ -337,13 +345,38 @@ namespace Connector
                     return;
                 }
 
-                _activeConnections[hello.Id] = socket;
+                if (_activeConnections.TryRemove(hello.Id, out var oldSocket))
+                {
+                    Console.WriteLine($"[Connector] Replacing existing connection to {hello.Id:N}");
+                    try { oldSocket.Shutdown(SocketShutdown.Both); } catch { }
+                    try { oldSocket.Close(); } catch { }
+                    try { oldSocket.Dispose(); } catch { }
+                }
 
+                _activeConnections[hello.Id] = socket;
                 Console.WriteLine($"[Connector] Accepted connection from {hello.Id:N}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Connector] HandleNewConnection error: {ex.Message}");
+                try { socket.Dispose(); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// Проверяет, живое ли TCP-соединение, без блокировки.
+        /// Возвращает false, если удалённая сторона прислала FIN/RST.
+        /// </summary>
+        private static bool IsSocketAlive(Socket socket)
+        {
+            try
+            {
+                if (!socket.Connected) return false;
+                return !(socket.Poll(0, SelectMode.SelectRead) && socket.Available == 0);
             }
             catch
             {
-                try { socket.Dispose(); } catch { }
+                return false;
             }
         }
 
@@ -418,39 +451,53 @@ namespace Connector
             }
         }
 
+        /// <summary>
+        /// Зовёт Disconnect только если в словаре всё ещё лежит ТОТ ЖЕ сокет
+        /// </summary>
+        private void DisconnectIfSame(Guid address, Socket expected, string reason)
+        {
+            if (_activeConnections.TryGetValue(address, out var current) && ReferenceEquals(current, expected))
+            {
+                Disconnect(address, reason);
+            }
+            else
+            {
+                try { expected.Dispose(); } catch { }
+            }
+        }
+
         private async Task ReadFromSocketInternalAsync(Guid connectionGuid, Socket socket, CancellationToken token)
         {
             try
             {
                 if (!socket.Connected || token.IsCancellationRequested) return;
-                Console.WriteLine($"[Connector] Read from {connectionGuid:N}, connected=True");
 
                 var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
                 string json = Encoding.UTF8.GetString(jsonBytes);
-                Console.WriteLine($"[Connector] Received packet type={packetType}, json='{json}'");
 
                 switch (packetType)
                 {
                     case MessagePacketType:
                         var msg = JsonSerializer.Deserialize<MessageDTO>(json);
-                        Console.WriteLine($"[Connector] Deserialized MessageDTO: msg={msg?.Message}, sender={msg?.Sender:N}");
                         if (msg is not null) MessageReceived?.Invoke(this, msg);
                         break;
 
                     case PingPacketType:
                         var ping = JsonSerializer.Deserialize<PingDTO>(json);
-                        Console.WriteLine($"[Connector] Deserialized PingDTO: reason={ping?.reason}");
                         if (ping is not null) PingReceived?.Invoke(this, ping);
-                        break;
-
-                    default:
-                        Console.WriteLine($"[Connector] Unknown packet type: {packetType}");
                         break;
                 }
             }
             catch (OperationCanceledException)
             {
-                Disconnect(connectionGuid, "Соединение закрыто удалённой стороной.");
+                DisconnectIfSame(connectionGuid, socket, "Соединение закрыто удалённой стороной.");
+            }
+            catch (SocketException)
+            {
+                DisconnectIfSame(connectionGuid, socket, "Сетевая ошибка при чтении.");
+            }
+            catch (ObjectDisposedException)
+            {
             }
             catch (Exception ex)
             {

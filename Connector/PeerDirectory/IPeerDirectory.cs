@@ -4,6 +4,9 @@ namespace Connector.PeerDirectory
 {
     public interface IPeerDirectory
     {
+
+        event EventHandler<Guid>? PeerLost;
+
         /// <summary>
         /// Попытаться получить endpoint узла по его Guid.
         /// </summary>
