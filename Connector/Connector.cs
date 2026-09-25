@@ -146,15 +146,21 @@ namespace Connector
 
         public async Task BroadcastAsync(PingDTO ping)
         {
-            byte[] packet = SerializePacket(PingPacketType, ping);
-            var sendTask = new List<Task<int>>();
-
-            foreach (var connections in _activeConnections.Keys)
+            foreach (var id in _peers.KnownPeers)
             {
-                sendTask.Add(SendPacketAsync(packet, connections, CancellationToken.None));
+                if (id == _myId) continue;
+                if (_activeConnections.ContainsKey(id)) continue;
+
+                try { await ConnectAsync(id).ConfigureAwait(false); }
+                catch { }
             }
 
-            await Task.WhenAll(sendTask).ConfigureAwait(false);
+            var packet = SerializePacket(PingPacketType, ping);
+            var tasks = _activeConnections.Keys
+                .Select(id => SendPacketAsync(packet, id, CancellationToken.None))
+                .ToArray();
+
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
         #endregion
