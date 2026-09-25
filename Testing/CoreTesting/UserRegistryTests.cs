@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.ComponentModel;
-using SimpleChat.Core.UserRegistry;
+using Abstractions.Core.UserRegistry;
 
 namespace Testing.CoreTesting
 {

@@ -1,6 +1,6 @@
 ﻿using Abstractions.Commands;
 
-namespace SimpleChat.Core.MessageHandler
+namespace Abstractions.Core.MessageHandler
 {
     public interface IMessageHandler
     {

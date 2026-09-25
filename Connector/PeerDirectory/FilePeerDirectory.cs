@@ -57,10 +57,5 @@ namespace Connector.PeerDirectory
             return new FilePeerDirectory(map);
         }
 
-        /// <summary>
-        /// Создать реестр из готового словаря (для тестов, конфигов в коде и т.п.).
-        /// </summary>
-        public static FilePeerDirectory FromDictionary(IDictionary<Guid, IPEndPoint> map) =>
-            new FilePeerDirectory(new Dictionary<Guid, IPEndPoint>(map));
     }
 }

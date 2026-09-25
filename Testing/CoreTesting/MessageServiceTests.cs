@@ -1,12 +1,11 @@
 ﻿using System.ComponentModel;
 using Abstractions.Commands;
 using Abstractions.DTO;
-using Abstractions.Interfaces;
 using Moq;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Core.UserRegistry;
-using SimpleChat.Interfaces;
-using SimpleChat.Model;
+using Abstractions.Core.MessageService;
+using Abstractions.Core.UserRegistry;
+using Abstractions.Interfaces;
+using Abstractions.Model;
 
 namespace Testing.CoreTesting
 {
@@ -210,7 +209,7 @@ namespace Testing.CoreTesting
                 peerId,
                 It.IsAny<CancellationToken>()), Times.Once);
         }
-        
+
         [Fact]
         [Description("При превышении таймаута асинхронной отправки выбрасывается TimeoutException")]
         public async Task SendMessageAsync_Timeout_ThrowsTimeoutException()
@@ -288,80 +287,6 @@ namespace Testing.CoreTesting
 
         // ================= Протокол пинга (новое) =================
 
-        [Fact]
-        [Description("Конструктор подписывается на событие PingReceived, входящий пинг регистрирует отправителя в реестре")]
-        public void Constructor_SubscribesToPingReceived()
-        {
-            var peerId = Guid.NewGuid();
-
-            _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                new PingDTO(peerId, DateTime.UtcNow, "pong"));
-
-            Assert.True(_registry.TryGetName(peerId, out _));
-        }
-
-        [Fact]
-        [Description("Входящий пинг регистрирует отправителя в реестре")]
-        public void IncomingPing_RegistersSenderInRegistry()
-        {
-            var peerId = Guid.NewGuid();
-            Assert.False(_registry.TryGetName(peerId, out _));
-
-            _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                new PingDTO(peerId, DateTime.UtcNow, "pong"));
-
-            Assert.True(_registry.TryGetName(peerId, out _));
-        }
-
-        [Fact]
-        [Description("Входящий пинг от самого себя игнорируется, ответ не отправляется, запись в реестр не добавляется")]
-        public void IncomingSelfPing_IsIgnored()
-        {
-            _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                new PingDTO(_user.UserId, DateTime.UtcNow, "discover"));
-
-            _connector.Verify(c => c.PingAsync(It.IsAny<PingDTO>(), It.IsAny<Guid>()), Times.Never);
-            Assert.False(_registry.TryGetName(_user.UserId, out _));
-        }
-
-        [Fact]
-        [Description("Входящий пинг с reason='discover' вызывает отправку ответного pong")]
-        public async Task IncomingDiscover_TriggersPongResponse()
-        {
-            var peerId = Guid.NewGuid();
-
-            var responded = new TaskCompletionSource<(PingDTO ping, Guid to)>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-
-            _connector
-                .Setup(c => c.PingAsync(It.IsAny<PingDTO>(), It.IsAny<Guid>()))
-                .Returns(Task.CompletedTask)
-                .Callback<PingDTO, Guid>((p, to) => responded.TrySetResult((p, to)));
-
-            _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                new PingDTO(peerId, DateTime.UtcNow, "discover"));
-
-            var completed = await Task.WhenAny(responded.Task, Task.Delay(1000));
-            Assert.Same(responded.Task, completed);
-
-            var (ping, to) = await responded.Task;
-            Assert.Equal("pong", ping.reason);
-            Assert.Equal(_user.UserId, ping.Sender);
-            Assert.Equal(peerId, to);
-        }
-
-        [Fact]
-        [Description("Входящий пинг с reason='pong' не вызывает ответного действия")]
-        public async Task IncomingPong_DoesNotTriggerResponse()
-        {
-            var peerId = Guid.NewGuid();
-
-            _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                new PingDTO(peerId, DateTime.UtcNow, "pong"));
-            await Task.Delay(FastDiscovery);
-
-            _connector.Verify(c => c.PingAsync(It.IsAny<PingDTO>(), It.IsAny<Guid>()), Times.Never);
-        }
 
         // ================= Discovery =================
 

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SimpleChat.Core.UserRegistry
+namespace Abstractions.Core.UserRegistry
 {
     public sealed class UserRegistry : IUserRegistry
     {

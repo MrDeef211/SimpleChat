@@ -1,7 +1,7 @@
 ﻿using Abstractions.Commands;
-using SimpleChat.Core.MessageService;
+using Abstractions.Core.MessageService;
 
-namespace SimpleChat.Core.MessageHandler
+namespace Abstractions.Core.MessageHandler
 {
     public class MessageHandler : IMessageHandler
     {

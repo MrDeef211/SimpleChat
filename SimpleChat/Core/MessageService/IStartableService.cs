@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SimpleChat.Core.MessageService
+namespace Abstractions.Core.MessageService
 {
     public interface IStartableService
     {

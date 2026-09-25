@@ -3,7 +3,7 @@ using Connector.Configuration;
 using Connector.PeerDirectory;
 using Connector.PeerDiscovery;
 using Microsoft.Extensions.DependencyInjection;
-using SimpleChat.Interfaces;
+using Abstractions.Interfaces;
 
 namespace Connector.Extensions
 {

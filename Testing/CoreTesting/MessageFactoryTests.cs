@@ -1,9 +1,9 @@
 ﻿using System.ComponentModel;
 using Abstractions.Commands;
 using Moq;
-using SimpleChat.Core.MessageFactory;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Model;
+using Abstractions.Core.MessageFactory;
+using Abstractions.Core.MessageService;
+using Abstractions.Model;
 
 namespace Testing.CoreTesting
 {

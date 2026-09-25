@@ -1,8 +1,8 @@
 ﻿using Abstractions.Commands;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Model;
+using Abstractions.Core.MessageService;
+using Abstractions.Model;
 
-namespace SimpleChat.Core.MessageFactory
+namespace Abstractions.Core.MessageFactory
 {
     public class MessageFactory(IMessageService service, UserInfo user) : IMessageFactory
     {

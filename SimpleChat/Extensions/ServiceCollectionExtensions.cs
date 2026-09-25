@@ -5,14 +5,14 @@ using Connector.Extensions;
 using Connector.PeerDirectory;
 using Connector.PeerDiscovery;
 using Microsoft.Extensions.DependencyInjection;
-using SimpleChat.Core.MessageFactory;
-using SimpleChat.Core.MessageHandler;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Core.UserRegistry;
-using SimpleChat.Interfaces;
-using SimpleChat.Model;
+using Abstractions.Core.MessageFactory;
+using Abstractions.Core.MessageHandler;
+using Abstractions.Core.MessageService;
+using Abstractions.Core.UserRegistry;
+using Abstractions.Interfaces;
+using Abstractions.Model;
 
-namespace SimpleChat.Extensions
+namespace Abstractions.Extensions
 {
     public static class ServiceCollectionExtensions
     {

@@ -2,7 +2,7 @@
 using GUI.Configuration;
 using GUI.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using SimpleChat.ChatApplication;
+using Abstractions.ChatApplication;
 
 namespace GUI
 {

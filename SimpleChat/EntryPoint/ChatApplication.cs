@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Extensions;
+using Abstractions.Core.MessageService;
+using Abstractions.Extensions;
 
-namespace SimpleChat.ChatApplication
+namespace Abstractions.ChatApplication
 {
     /// <summary>
     /// Точка входа в приложение чата. Управляет контейнером и жизненным циклом сервисов.

@@ -1,12 +1,11 @@
 ﻿using System.Collections.Concurrent;
 using Abstractions.Commands;
 using Abstractions.DTO;
+using Abstractions.Core.UserRegistry;
 using Abstractions.Interfaces;
-using SimpleChat.Core.UserRegistry;
-using SimpleChat.Interfaces;
-using SimpleChat.Model;
+using Abstractions.Model;
 
-namespace SimpleChat.Core.MessageService
+namespace Abstractions.Core.MessageService
 {
     public class MessageService : IMessageService, IConnectionService, IStartableService, IDisposable
     {
@@ -41,7 +40,7 @@ namespace SimpleChat.Core.MessageService
             _sendTimeout = sendTimeout ?? TimeSpan.FromSeconds(5);
 
             _connector.MessageReceived += OnConnectorMessageReceived;
-            _connector.PingReceived += OnConnectorPingReceived;
+            _connector.PeerDisconnected += OnConnectorPeerDisconnected;
 
         }
 
@@ -68,8 +67,8 @@ namespace SimpleChat.Core.MessageService
             var task = Task.Run(() => _connector.Send(dto, receiverId));
             if (!task.Wait(_sendTimeout))
                 throw new TimeoutException($"Превышено время ожидания отправки ({_sendTimeout.TotalSeconds} с).");
-            task.GetAwaiter().GetResult();
             Console.WriteLine($"[MessageService] SendMessage: receiver='{command.Receiver}', message='{command.Message}'");
+            task.GetAwaiter().GetResult();
         }
 
         public async Task SendMessageAsync(SendMessageCommand command)
@@ -131,6 +130,14 @@ namespace SimpleChat.Core.MessageService
 
         #region Работа с пользователями
 
+        private void OnConnectorPeerDisconnected(object? sender, Guid peerId)
+        {
+            if (peerId == _localId) return;
+
+            if (_registry.TryGetName(peerId, out var name))
+                MarkDisconnected(name);
+        }
+
         public bool TryRename(string oldName, string newName) => _registry.TryRename(oldName, newName);
 
         public List<string> GetUsers()
@@ -180,35 +187,12 @@ namespace SimpleChat.Core.MessageService
             MessageReceived?.Invoke(this, command);
         }
 
-        private void OnConnectorPingReceived(object? sender, PingDTO ping)
-        {
-            if (ping.Sender == _localId) return;
-
-            _registry.GetOrAddName(ping.Sender);
-
-            if (string.Equals(ping.reason, "discover", StringComparison.OrdinalIgnoreCase))
-                _ = RespondToDiscoverAsync(ping.Sender);
-        }
-
-        private async Task RespondToDiscoverAsync(Guid to)
-        {
-            try
-            {
-                var pong = new PingDTO(_localId, DateTime.UtcNow, "pong");
-                await _connector.PingAsync(pong, to).ConfigureAwait(false);
-            }
-            catch
-            {
-
-            }
-        }
-
         #endregion
 
         public void Dispose()
         {
             _connector.MessageReceived -= OnConnectorMessageReceived;
-            _connector.PingReceived -= OnConnectorPingReceived;
+            _connector.PeerDisconnected -= OnConnectorPeerDisconnected;
             MessageReceived = null;
             _connected.Clear();
         }

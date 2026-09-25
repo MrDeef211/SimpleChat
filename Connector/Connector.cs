@@ -6,7 +6,7 @@ using System.Text.Json;
 using Abstractions.DTO;
 using Connector.PeerDirectory;
 using Connector.PeerDiscovery;
-using SimpleChat.Interfaces;
+using Abstractions.Interfaces;
 
 
 namespace Connector
@@ -23,13 +23,15 @@ namespace Connector
 
         private readonly IPeerDiscovery? _discovery;
         private TcpListener? _listener;
-        private bool _disposed;
+
+        private int _disposed;
         private bool _isReceiving;
         private CancellationTokenSource? _receiveCts;
         private readonly object _receiveLock = new object();
 
         public event EventHandler<MessageDTO>? MessageReceived;
         public event EventHandler<PingDTO>? PingReceived;
+        public event EventHandler<Guid>? PeerDisconnected;
 
         // Для разлечения типов пакетов
         private const byte MessagePacketType = 1;
@@ -68,7 +70,7 @@ namespace Connector
 
         private async Task<int> SendPacketAsync(byte[] packet, Guid receiver, CancellationToken token)
         {
-            if (_disposed) return 400; // Узел уничтножен
+            if (Volatile.Read(ref _disposed) != 0) return 400;
 
             Console.WriteLine($"[Connector] SendPacket to {receiver:N}, active={_activeConnections.Count}");
 
@@ -212,8 +214,9 @@ namespace Connector
                 Console.WriteLine($"[Connector] Connect to {address:N} OK");
                 return 200;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[Connector] Connect err: {ex.Message}");
                 return 503;
             }
         }
@@ -225,19 +228,17 @@ namespace Connector
                 try
                 {
                     if (socket.Connected)
-                    {
                         socket.Shutdown(SocketShutdown.Both);
-                    }
                 }
-                catch
-                {
-
-                }
+                catch { }
                 finally
                 {
-                    socket.Close();
-                    socket.Dispose();
+                    try { socket.Close(); } catch { }
+                    try { socket.Dispose(); } catch { }
                 }
+
+                Console.WriteLine($"[Connector] Disconnected {address:N} ({reason})");
+                PeerDisconnected?.Invoke(this, address);
             }
         }
 
@@ -286,8 +287,8 @@ namespace Connector
             lock (_receiveLock)
             {
                 if (!_isReceiving) return;
-
                 _isReceiving = false;
+
                 cts = _receiveCts;
                 _receiveCts = null;
 
@@ -461,14 +462,13 @@ namespace Connector
 
         public void Dispose()
         {
-            if (!_disposed)
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+
+            try { StopReciveAsync().GetAwaiter().GetResult(); } catch { }
+            foreach (var guid in _activeConnections.Keys)
             {
-                StopReciveAsync().GetAwaiter().GetResult();
-                foreach (var guid in _activeConnections.Keys)
-                {
-                    Disconnect(guid, "Connector уничтожен");
-                }
-                _disposed = true;
+                try { Disconnect(guid, "Connector уничтожен"); } catch { }
             }
         }
 

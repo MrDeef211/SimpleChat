@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using Abstractions.DTO;
 using Abstractions.Interfaces;
-using SimpleChat.Interfaces;
 
 namespace Connector
 {
@@ -9,6 +8,7 @@ namespace Connector
     {
         public event EventHandler<MessageDTO>? MessageReceived;
         public event EventHandler<PingDTO>? PingReceived;
+        public event EventHandler<Guid>? PeerDisconnected;
 
         /// <summary>
         /// Искусственная задержка сетевых операций

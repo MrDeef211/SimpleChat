@@ -1,6 +1,6 @@
 ﻿using Abstractions.Commands;
 
-namespace SimpleChat.Core.MessageService
+namespace Abstractions.Core.MessageService
 {
     // Для внутреннего использования IConnector, не использовать IConnector напрямую
     public interface IMessageService

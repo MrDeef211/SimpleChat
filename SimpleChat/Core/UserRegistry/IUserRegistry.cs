@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SimpleChat.Core.UserRegistry
+namespace Abstractions.Core.UserRegistry
 {
     public interface IUserRegistry
     {

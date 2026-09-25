@@ -1,6 +1,6 @@
 ﻿using Abstractions.DTO;
 
-namespace SimpleChat.Interfaces
+namespace Abstractions.Interfaces
 {
     // Не использовать напрямую, только через IMessageService
     public interface IConnector
@@ -26,6 +26,8 @@ namespace SimpleChat.Interfaces
         /// ответе принимает <c>MessageService</c>.
         /// </remarks>
         event EventHandler<PingDTO>? PingReceived;
+
+        event EventHandler<Guid>? PeerDisconnected;
 
         /// <summary>
         /// Синхронно отправить сообщение конкретному узлу.

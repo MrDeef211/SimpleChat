@@ -1,12 +1,11 @@
 ﻿using Abstractions.Commands;
 using Abstractions.DTO;
-using Abstractions.Interfaces;
 using Connector;
 using Moq;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Core.UserRegistry;
-using SimpleChat.Interfaces;
-using SimpleChat.Model;
+using Abstractions.Core.MessageService;
+using Abstractions.Core.UserRegistry;
+using Abstractions.Interfaces;
+using Abstractions.Model;
 
 namespace Testing.ConnectrorTesting
 {

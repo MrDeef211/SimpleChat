@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -25,6 +26,8 @@ namespace Connector.PeerDiscovery
 
         public event EventHandler<PeerDiscoveredEventArgs>? PeerDiscovered;
         public event EventHandler<Guid>? PeerLost;
+
+        private record ByePacket(Guid Id);
 
         public UdpDiscovery(
         Guid myId,
@@ -60,12 +63,12 @@ namespace Connector.PeerDiscovery
             return Task.CompletedTask;
         }
 
-        public Task StopAsync(CancellationToken token = default)
+        public async Task StopAsync(CancellationToken token = default)
         {
+            await SendGoodbyeAsync().ConfigureAwait(false);
             _cts?.Cancel();
             _cts?.Dispose();
             _cts = null;
-            return Task.CompletedTask;
         }
 
         private async Task AnnounceLoopAsync(CancellationToken token)
@@ -75,7 +78,7 @@ namespace Connector.PeerDiscovery
             {
                 try
                 {
-                    var hello = new HelloPacket(_myId, _myTcpPort, _myName, DateTime.UtcNow);
+                    var hello = new HelloPacket(_myId, _myTcpPort, _myName);
                     var bytes = JsonSerializer.SerializeToUtf8Bytes(hello);
                     await _sendClient.SendAsync(bytes, endpoint, token).ConfigureAwait(false);
                     Console.WriteLine($"[UdpDiscovery] Announce: id={_myId:N}, port={_myTcpPort}");
@@ -93,19 +96,46 @@ namespace Connector.PeerDiscovery
                 try
                 {
                     var result = await _receiveClient.ReceiveAsync(token).ConfigureAwait(false);
-                    Console.WriteLine($"[UdpDiscovery] Received {result.Buffer.Length}B from {result.RemoteEndPoint}");
+                    Console.WriteLine($"[UdpDiscovery] Received {result.Buffer.Length}B " +
+                        $"from {result.RemoteEndPoint}");
 
-                    var hello = JsonSerializer.Deserialize<HelloPacket>(result.Buffer);
+                    HelloPacket? hello = null;
+                    ByePacket? bye = null;
+
+                    try
+                    {
+                        hello = JsonSerializer.Deserialize<HelloPacket>(result.Buffer);
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            bye = JsonSerializer.Deserialize<ByePacket>(result.Buffer);
+                        }
+                        catch { }
+                    }
+                    if (bye is not null)
+                    {
+                        if (bye.Id == _myId) continue;
+                        if (_lastSeen.TryRemove(bye.Id, out _))
+                        {
+                            Console.WriteLine($"[UdpDiscovery] BYE: {bye.Id:N}");
+                            PeerLost?.Invoke(this, bye.Id);
+                        }
+                        continue;
+                    }
                     if (hello is null) continue;
 
-                    Console.WriteLine($"[UdpDiscovery] Hello from id={hello.Id:N}, tcpPort={hello.TcpPort}");
+                    Console.WriteLine($"[UdpDiscovery] Hello " +
+                        $"from id={hello.Id:N}, tcpPort={hello.TcpPort}");
                     if (hello.Id == _myId) continue;
 
                     var endpoint = new IPEndPoint(result.RemoteEndPoint.Address, hello.TcpPort);
                     _lastSeen[hello.Id] = DateTime.UtcNow;
 
                     Console.WriteLine($"[UdpDiscovery] DISCOVERED: {hello.Id:N} @ {endpoint}");
-                    PeerDiscovered?.Invoke(this, new PeerDiscoveredEventArgs(hello.Id, endpoint, hello.Name));
+                    PeerDiscovered?.Invoke(this, 
+                        new PeerDiscoveredEventArgs(hello.Id, endpoint, hello.Name));
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex) { Console.WriteLine($"[UdpDiscovery] Listen err: {ex}"); }
@@ -129,6 +159,17 @@ namespace Connector.PeerDiscovery
             }
         }
 
+        private async Task SendGoodbyeAsync()
+        {
+            try
+            {
+                var bye = JsonSerializer.SerializeToUtf8Bytes(new ByePacket(_myId));
+                await _sendClient.SendAsync(bye, new IPEndPoint(_multicastAddress, _discoveryPort))
+                                .ConfigureAwait(false);
+            }
+            catch { }
+        }
+
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
@@ -138,6 +179,6 @@ namespace Connector.PeerDiscovery
             try { _sendClient.Dispose(); } catch { }
         }
 
-        private sealed record HelloPacket(Guid Id, int TcpPort, string? Name, DateTime SentAt);
+        private sealed record HelloPacket(Guid Id, int TcpPort, string? Name);
     }
 }

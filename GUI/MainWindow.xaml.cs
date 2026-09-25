@@ -4,11 +4,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Abstractions.Commands;
 using GUI.ViewModels;
-using SimpleChat.Core.MessageFactory;
-using SimpleChat.Core.MessageHandler;
-using SimpleChat.Core.MessageService;
-using SimpleChat.Core.UserRegistry;
-using SimpleChat.Model;
+using Abstractions.Core.MessageFactory;
+using Abstractions.Core.MessageHandler;
+using Abstractions.Core.MessageService;
+using Abstractions.Core.UserRegistry;
+using Abstractions.Model;
 
 namespace GUI
 {

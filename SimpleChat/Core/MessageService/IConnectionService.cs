@@ -1,4 +1,4 @@
-﻿namespace SimpleChat.Core.MessageService
+﻿namespace Abstractions.Core.MessageService
 {
     public interface IConnectionService
     {

@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace SimpleChat.Model
+namespace Abstractions.Model
 {
     public class UserInfo
     {

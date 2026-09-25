@@ -7,15 +7,12 @@ namespace Connector.PeerDirectory
     public sealed class HybridPeerDirectory : IPeerDirectory, IDisposable
     {
         private readonly ConcurrentDictionary<Guid, IPEndPoint> _peers = new();
-        private readonly IPeerDirectory? _staticPeers;
         private readonly IPeerDiscovery? _discovery;
 
         public HybridPeerDirectory(
             IPeerDirectory? staticPeers = null,
             IPeerDiscovery? discovery = null)
         {
-            _staticPeers = staticPeers;
-
             if (staticPeers is not null)
                 foreach (var id in staticPeers.KnownPeers)
                     if (staticPeers.TryGetEndpoint(id, out var ep))
