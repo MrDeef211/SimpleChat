@@ -22,6 +22,9 @@ namespace Testing.CoreTesting
 
         public MessageServiceTests()
         {
+
+            _connector.Setup(c => c.GetKnownPeers()).Returns(Array.Empty<Guid>());
+
             _service = new MessageService(
                 _connector.Object, _registry, _user,
                 discoveryTimeout: FastDiscovery,
@@ -363,44 +366,53 @@ namespace Testing.CoreTesting
         // ================= Discovery =================
 
         [Fact]
-        [Description("GetUsersAsync выполняет широковещательный запрос, собирает имена ответивших, исключая себя")]
-        public async Task GetUsersAsync_UsesBroadcast_AndCollectsNamesExcludingSelf()
+        public async Task GetUsersAsync_ReturnsKnownPeersExcludingSelf()
         {
             var peerA = Guid.NewGuid();
             var peerB = Guid.NewGuid();
 
             _connector
-                .Setup(c => c.BroadcastAsync(It.IsAny<PingDTO>()))
-                .Returns(Task.CompletedTask)
-                .Callback(() =>
-                {
-                    _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                        new PingDTO(peerA, DateTime.UtcNow, "pong"));
-                    _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                        new PingDTO(peerB, DateTime.UtcNow, "pong"));
-                    _connector.Raise(c => c.PingReceived += null, _connector.Object,
-                        new PingDTO(_user.UserId, DateTime.UtcNow, "pong"));
-                });
+                .Setup(c => c.GetKnownPeers())
+                .Returns(new[] { peerA, peerB, _user.UserId });   // self тоже в списке
 
-            List<string> users = await _service.GetUsersAsync();
-
-            _connector.Verify(c => c.BroadcastAsync(
-                It.Is<PingDTO>(p => p.reason == "discover" && p.Sender == _user.UserId)),
-                Times.Once);
+            var users = await _service.GetUsersAsync();
 
             Assert.Equal(2, users.Count);
             Assert.Contains(users, u => _registry.GetId(u) == peerA);
             Assert.Contains(users, u => _registry.GetId(u) == peerB);
+            Assert.DoesNotContain(users, u => _registry.GetId(u) == _user.UserId);
         }
 
         [Fact]
-        [Description("При отсутствии ответов GetUsersAsync возвращает пустой список")]
+        public async Task GetUsersAsync_AssignsNamesToUnknownPeers()
+        {
+            var peerId = Guid.NewGuid();
+            _connector.Setup(c => c.GetKnownPeers()).Returns(new[] { peerId });
+
+            var users = await _service.GetUsersAsync();
+
+            Assert.Single(users);
+            Assert.StartsWith("User-", users[0]);
+            // Имя зарегистрировано в реестре под этим Guid.
+            Assert.Equal(peerId, _registry.GetId(users[0]));
+        }
+
+
+        public void GetUsers_ReturnsKnownPeersExcludingSelf()
+        {
+            var peerId = Guid.NewGuid();
+            _connector
+                .Setup(c => c.GetKnownPeers())
+                .Returns(new[] { peerId, _user.UserId });
+
+            var users = _service.GetUsers();
+
+            Assert.Single(users);
+            Assert.Equal(peerId, _registry.GetId(users[0]));
+        }
+
         public async Task GetUsersAsync_EmptyNetwork_ReturnsEmptyList()
         {
-            _connector
-                .Setup(c => c.BroadcastAsync(It.IsAny<PingDTO>()))
-                .Returns(Task.CompletedTask);
-
             var users = await _service.GetUsersAsync();
 
             Assert.Empty(users);

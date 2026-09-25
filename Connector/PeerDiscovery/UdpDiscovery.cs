@@ -7,8 +7,8 @@ namespace Connector.PeerDiscovery
 {
     public sealed class UdpDiscovery : IPeerDiscovery, IDisposable
     {
-        private static readonly IPAddress MulticastAddress = IPAddress.Parse("239.255.42.99");
-        private const int DiscoveryPort = 5000;
+        private readonly IPAddress _multicastAddress;
+        private readonly int _discoveryPort;
         private static readonly TimeSpan AnnounceInterval = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan PeerTimeout = TimeSpan.FromSeconds(10);
 
@@ -26,26 +26,29 @@ namespace Connector.PeerDiscovery
         public event EventHandler<PeerDiscoveredEventArgs>? PeerDiscovered;
         public event EventHandler<Guid>? PeerLost;
 
-        public UdpDiscovery(Guid myId, int myTcpPort, string? myName = null)
+        public UdpDiscovery(
+        Guid myId,
+        int myTcpPort,
+        string? myName,
+        int discoveryPort,
+        IPAddress multicastAddress)
         {
             _myId = myId;
             _myTcpPort = myTcpPort;
             _myName = myName;
+            _discoveryPort = discoveryPort;
+            _multicastAddress = multicastAddress;
 
             _sendClient = new UdpClient();
             _sendClient.MulticastLoopback = true;
             _sendClient.Client.SetSocketOption(
-                SocketOptionLevel.IP,
-                SocketOptionName.MulticastTimeToLive,
-                1);
+                SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 1);
 
             _receiveClient = new UdpClient();
             _receiveClient.Client.SetSocketOption(
-                SocketOptionLevel.Socket,
-                SocketOptionName.ReuseAddress,
-                true);
-            _receiveClient.Client.Bind(new IPEndPoint(IPAddress.Any, DiscoveryPort));
-            _receiveClient.JoinMulticastGroup(MulticastAddress);
+                SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            _receiveClient.Client.Bind(new IPEndPoint(IPAddress.Any, discoveryPort));
+            _receiveClient.JoinMulticastGroup(multicastAddress);
         }
 
         public Task StartAsync(CancellationToken token = default)
@@ -67,7 +70,7 @@ namespace Connector.PeerDiscovery
 
         private async Task AnnounceLoopAsync(CancellationToken token)
         {
-            var endpoint = new IPEndPoint(MulticastAddress, DiscoveryPort);
+            var endpoint = new IPEndPoint(_multicastAddress, _discoveryPort);
             while (!token.IsCancellationRequested)
             {
                 try
@@ -130,7 +133,7 @@ namespace Connector.PeerDiscovery
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
             try { StopAsync().GetAwaiter().GetResult(); } catch { }
-            try { _receiveClient.DropMulticastGroup(MulticastAddress); } catch { }
+            try { _receiveClient.DropMulticastGroup(_multicastAddress); } catch { }
             try { _receiveClient.Dispose(); } catch { }
             try { _sendClient.Dispose(); } catch { }
         }

@@ -43,16 +43,21 @@ namespace Testing.ConnectrorTesting
             var peerA = Guid.NewGuid();
             var peerB = Guid.NewGuid();
 
-            using var connA = new FakeConnector { Latency = TimeSpan.Zero, KnownPeers = new[] { peerB } };
-            using var connB = new FakeConnector { Latency = TimeSpan.Zero, KnownPeers = new[] { peerA } };
+            var connA = new Mock<IConnector>();
+            var connB = new Mock<IConnector>();
+
+            connA.Setup(c => c.GetKnownPeers()).Returns(new[] { peerB });
+            connB.Setup(c => c.GetKnownPeers()).Returns(new[] { peerA });
 
             var regA = new UserRegistry();
             var regB = new UserRegistry();
 
-            var svcA = new MessageService(connA, regA, new UserInfo(peerA, "A"),
-                discoveryTimeout: TimeSpan.FromMilliseconds(30));
-            var svcB = new MessageService(connB, regB, new UserInfo(peerB, "B"),
-                discoveryTimeout: TimeSpan.FromMilliseconds(30));
+            using var svcA = new MessageService(connA.Object, regA,
+                new UserInfo(peerA, "A"),
+                discoveryTimeout: TimeSpan.FromMilliseconds(20));
+            using var svcB = new MessageService(connB.Object, regB,
+                new UserInfo(peerB, "B"),
+                discoveryTimeout: TimeSpan.FromMilliseconds(20));
 
             var usersOnA = await svcA.GetUsersAsync();
             var usersOnB = await svcB.GetUsersAsync();
@@ -85,10 +90,8 @@ namespace Testing.ConnectrorTesting
             var nameB = regA.GetOrAddName(peerB);
             var nameA = regB.GetOrAddName(peerA);
 
-            connA.Setup(c => c.ConnectAsync(peerB, It.IsAny<CancellationToken>()))
-                 .ReturnsAsync(200);
-            connB.Setup(c => c.ConnectAsync(peerA, It.IsAny<CancellationToken>()))
-                 .ReturnsAsync(200);
+            connA.Setup(c => c.GetKnownPeers()).Returns(Array.Empty<Guid>());
+            connB.Setup(c => c.GetKnownPeers()).Returns(Array.Empty<Guid>());
 
             connA
                 .Setup(c => c.SendAsync(It.IsAny<MessageDTO>(), peerB, It.IsAny<CancellationToken>()))

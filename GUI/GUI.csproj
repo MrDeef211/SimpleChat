@@ -19,6 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
+  	<None Update="connector.json">
+  		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  	</None>
   	<None Update="peers.json">
   		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   	</None>
