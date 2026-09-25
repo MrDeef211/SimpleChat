@@ -70,6 +70,8 @@ namespace Connector
         {
             if (_disposed) return 400; // Узел уничтножен
 
+            Console.WriteLine($"[Connector] SendPacket to {receiver:N}, active={_activeConnections.Count}");
+
             if (!_activeConnections.TryGetValue(receiver, out var socket) || !socket.Connected)
             {
                 return 400; // Отсутствие подключение
@@ -78,10 +80,12 @@ namespace Connector
             try
             {
                 await socket.SendAsync(packet, SocketFlags.None, token);
+                Console.WriteLine($"[Connector] SendPacket to {receiver:N} → code 200");
                 return 200; // Успешно
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[Connector] SendPacket err: {ex.Message}");
                 return 500; // Ошибка сети
             }
         }
@@ -184,10 +188,16 @@ namespace Connector
         public async Task<int> ConnectAsync(Guid address, CancellationToken token = default)
         {
             if (_activeConnections.TryGetValue(address, out var existingSocket) && existingSocket.Connected)
-                return 200;
+            { 
+                Console.WriteLine($"[Connector] Connect: already connected to {address:N}"); 
+                return 200; 
+            }
 
             if (!_peers.TryGetEndpoint(address, out var endPoint))
-                return 404;
+            { 
+                Console.WriteLine($"[Connector] Connect: no endpoint for {address:N}"); 
+                return 404; 
+            }
 
             try
             {
@@ -199,6 +209,7 @@ namespace Connector
                 await socket.SendAsync(hello, SocketFlags.None, token).ConfigureAwait(false);
 
                 _activeConnections[address] = socket;
+                Console.WriteLine($"[Connector] Connect to {address:N} OK");
                 return 200;
             }
             catch
@@ -327,6 +338,8 @@ namespace Connector
                 }
 
                 _activeConnections[hello.Id] = socket;
+
+                Console.WriteLine($"[Connector] Accepted connection from {hello.Id:N}");
             }
             catch
             {
@@ -410,6 +423,8 @@ namespace Connector
             try
             {
                 if (!socket.Connected || token.IsCancellationRequested) return;
+
+                Console.WriteLine($"[Connector] Read from {connectionGuid:N}, connected={socket.Connected}");
 
                 var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
                 string json = Encoding.UTF8.GetString(jsonBytes);

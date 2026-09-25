@@ -69,6 +69,7 @@ namespace SimpleChat.Core.MessageService
             if (!task.Wait(_sendTimeout))
                 throw new TimeoutException($"Превышено время ожидания отправки ({_sendTimeout.TotalSeconds} с).");
             task.GetAwaiter().GetResult();
+            Console.WriteLine($"[MessageService] SendMessage: receiver='{command.Receiver}', message='{command.Message}'");
         }
 
         public async Task SendMessageAsync(SendMessageCommand command)
@@ -78,6 +79,7 @@ namespace SimpleChat.Core.MessageService
             try
             {
                 await _connector.SendAsync(CreateDTO(command), receiverId, cts.Token).ConfigureAwait(false);
+                Console.WriteLine($"[MessageService] SendMessage: receiver='{command.Receiver}', message='{command.Message}'");
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
