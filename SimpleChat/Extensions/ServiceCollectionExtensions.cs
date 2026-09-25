@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Abstractions.Interfaces;
 using Connector;
+using Connector.PeerDirectory;
 using Microsoft.Extensions.DependencyInjection;
 using SimpleChat.Core.MessageFactory;
 using SimpleChat.Core.MessageHandler;
@@ -21,6 +22,9 @@ namespace SimpleChat.Extensions
         public static IServiceCollection AddChatServices(this IServiceCollection services)
         {
             services.AddSingleton<UserInfo>(provider => GetUserInfo());
+
+            services.AddSingleton<IPeerDirectory>(_ =>
+                PeerDirectory.FromJsonFile("peers.json"));
 
             services.AddSingleton<IConnector, Connector.Connector>();
 

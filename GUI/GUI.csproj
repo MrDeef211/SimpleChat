@@ -18,4 +18,10 @@
   	</None>
   </ItemGroup>
 
+  <ItemGroup>
+  	<None Update="peers.json">
+  		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  	</None>
+  </ItemGroup>
+
 </Project>

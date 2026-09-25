@@ -1,9 +1,9 @@
 ﻿using System.Collections.Concurrent;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Abstractions.DTO;
+using Connector.PeerDirectory;
 using SimpleChat.Interfaces;
 
 
@@ -15,7 +15,7 @@ namespace Connector
         private readonly ConcurrentDictionary<Guid, Socket> _activeConnections = new();
 
         // Карта известных адресов
-        private readonly Dictionary<Guid, IPEndPoint> _knowConnections;
+        private readonly IPeerDirectory _peers;
 
         private bool _disposed;
         private bool _isReceiving;
@@ -30,9 +30,9 @@ namespace Connector
         private const byte PingPacketType = 2;
 
         // Конструктор
-        public Connector(Dictionary<Guid, IPEndPoint> knowConnections)
+        public Connector(IPeerDirectory peers)
         {
-            _knowConnections = knowConnections ?? throw new ArgumentException(null, nameof(knowConnections));
+            _peers = peers ?? throw new ArgumentNullException(nameof(peers));
         }
 
         #region Сериализация и отправка пакетов
@@ -166,7 +166,7 @@ namespace Connector
                 return 200;
             }
 
-            if (!_knowConnections.TryGetValue(address, out var endPoint))
+            if (!_peers.TryGetEndpoint(address, out var endPoint))
             {
                 return 404;
             }
