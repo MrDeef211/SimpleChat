@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Abstractions.DTO;
 using Connector.PeerDirectory;
+using Connector.PeerDiscovery;
 using SimpleChat.Interfaces;
 
 
@@ -20,6 +21,7 @@ namespace Connector
         private readonly int _myListeningPort;
         private readonly Guid _myId;
 
+        private readonly IPeerDiscovery? _discovery;
         private TcpListener? _listener;
         private bool _disposed;
         private bool _isReceiving;
@@ -35,11 +37,16 @@ namespace Connector
         private const byte HelloPacketType = 3;
 
         // Конструктор
-        public Connector(IPeerDirectory peers, Guid myId, int myListeningPort)
+        public Connector(
+        IPeerDirectory peers,
+        Guid myId,
+        int myListeningPort,
+        IPeerDiscovery? discovery = null)
         {
             _peers = peers ?? throw new ArgumentNullException(nameof(peers));
             _myId = myId;
             _myListeningPort = myListeningPort;
+            _discovery = discovery;
         }
 
         #region Сериализация и отправка пакетов
@@ -224,13 +231,13 @@ namespace Connector
 
         #region Приём
 
-        public Task StartReciveAsync(CancellationToken token = default)
+        public async Task StartReciveAsync(CancellationToken token = default)
         {
             CancellationToken loopToken;
 
             lock (_receiveLock)
             {
-                if (_isReceiving) return Task.CompletedTask;
+                if (_isReceiving) return;
 
                 _isReceiving = true;
                 _receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -240,28 +247,36 @@ namespace Connector
                 _listener.Start();
             }
 
+            if (_discovery is not null)
+                await _discovery.StartAsync(loopToken).ConfigureAwait(false);
+
             _ = AcceptLoopAsync(loopToken);
             _ = Task.Run(() => GlobalReceiveMonitoringLoopAsync(loopToken), loopToken);
-
-            return Task.CompletedTask;
         }
 
-        public Task StopReciveAsync()
+        public async Task StopReciveAsync()
         {
+            CancellationTokenSource? cts;
+            TcpListener? listener;
+
             lock (_receiveLock)
             {
-                if (!_isReceiving) return Task.CompletedTask;
-
-                _receiveCts?.Cancel();
-                _receiveCts?.Dispose();
-                _receiveCts = null;
-
-                try { _listener?.Stop(); } catch { }
-                _listener = null;
+                if (!_isReceiving) return;
 
                 _isReceiving = false;
+                cts = _receiveCts;
+                _receiveCts = null;
+
+                listener = _listener;
+                _listener = null;
             }
-            return Task.CompletedTask;
+
+            try { cts?.Cancel(); } catch { }
+            try { listener?.Stop(); } catch { }
+            cts?.Dispose();
+
+            if (_discovery is not null)
+                await _discovery.StopAsync().ConfigureAwait(false);
         }
 
         private async Task AcceptLoopAsync(CancellationToken token)

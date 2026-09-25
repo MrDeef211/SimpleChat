@@ -42,7 +42,6 @@ namespace Connector.PeerDirectory
             {
                 _discovery.PeerDiscovered -= OnDiscovered;
                 _discovery.PeerLost -= OnLost;
-                _discovery.Dispose();
             }
         }
     }

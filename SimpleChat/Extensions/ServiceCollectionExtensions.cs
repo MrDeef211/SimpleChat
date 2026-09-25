@@ -25,11 +25,13 @@ namespace SimpleChat.Extensions
 
             const int TcpPort = 5001;
 
-            services.AddSingleton<IPeerDiscovery>(sp =>
+            services.AddSingleton<UdpDiscovery>(sp =>
             {
                 var user = sp.GetRequiredService<UserInfo>();
                 return new UdpDiscovery(user.UserId, TcpPort, user.LocalName);
             });
+
+            services.AddSingleton<IPeerDiscovery>(sp => sp.GetRequiredService<UdpDiscovery>());
 
             services.AddSingleton<IPeerDirectory>(sp =>
             {
@@ -42,8 +44,9 @@ namespace SimpleChat.Extensions
             {
                 var user = sp.GetRequiredService<UserInfo>();
                 var peers = sp.GetRequiredService<IPeerDirectory>();
-                const int tcpPort = TcpPort;
-                return new Connector.Connector(peers, user.UserId, tcpPort);
+                var discovery = sp.GetRequiredService<IPeerDiscovery>();
+
+                return new Connector.Connector(peers, user.UserId, TcpPort, discovery);
             });
 
             services.AddSingleton<IUserRegistry, UserRegistry>();
