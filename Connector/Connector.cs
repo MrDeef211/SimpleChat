@@ -206,21 +206,47 @@ namespace Connector
                 return 404;
             }
 
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            handshakeCts.CancelAfter(TimeSpan.FromSeconds(3));
+
             try
             {
-                var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                await socket.ConnectAsync(endPoint, token).ConfigureAwait(false);
+                await socket.ConnectAsync(endPoint, handshakeCts.Token).ConfigureAwait(false);
 
                 var hello = SerializePacket(HelloPacketType, new HelloDTO(_myId, _myListeningPort));
-                await socket.SendAsync(hello, SocketFlags.None, token).ConfigureAwait(false);
+                await socket.SendAsync(hello, SocketFlags.None, handshakeCts.Token).ConfigureAwait(false);
+
+                var (ackType, ackJson) = await ReadPacketAsync(socket, handshakeCts.Token).ConfigureAwait(false);
+                if (ackType != HelloPacketType)
+                {
+                    Console.WriteLine($"[Connector] Handshake failed for {address:N}: unexpected packet type {ackType}");
+                    socket.Dispose();
+                    return 503;
+                }
+
+                var remoteHello = JsonSerializer.Deserialize<HelloDTO>(ackJson);
+                if (remoteHello is null || remoteHello.Id != address)
+                {
+                    Console.WriteLine($"[Connector] Handshake failed for {address:N}: id mismatch");
+                    socket.Dispose();
+                    return 503;
+                }
 
                 _activeConnections[address] = socket;
-                Console.WriteLine($"[Connector] Connect to {address:N} OK");
+                Console.WriteLine($"[Connector] Connect to {address:N} OK (handshake complete)");
                 return 200;
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested)
+            {
+                Console.WriteLine($"[Connector] Handshake timeout for {address:N}");
+                try { socket.Dispose(); } catch { }
+                return 503;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[Connector] Connect err: {ex.Message}");
+                try { socket.Dispose(); } catch { }
                 return 503;
             }
         }
@@ -356,6 +382,19 @@ namespace Connector
 
                 _activeConnections[hello.Id] = socket;
                 Console.WriteLine($"[Connector] Accepted connection from {hello.Id:N}");
+
+                var ack = SerializePacket(HelloPacketType, new HelloDTO(_myId, _myListeningPort));
+                try
+                {
+                    await socket.SendAsync(ack, SocketFlags.None, token).ConfigureAwait(false);
+                    Console.WriteLine($"[Connector] Sent hello-ack to {hello.Id:N}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Connector] Failed to send hello-ack to {hello.Id:N}: {ex.Message}");
+                    _activeConnections.TryRemove(hello.Id, out _);
+                    try { socket.Dispose(); } catch { }
+                }
             }
             catch (Exception ex)
             {

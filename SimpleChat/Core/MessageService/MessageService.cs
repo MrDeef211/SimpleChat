@@ -206,7 +206,11 @@ namespace Abstractions.Core.MessageService
         {
             var senderName = _registry.GetOrAddName(dto.Sender);
 
-            MarkConnected(senderName);
+            if (!_connected.ContainsKey(senderName))
+            {
+                Console.WriteLine($"[MessageService] Ignoring message from unconnected peer: {senderName}");
+                return;
+            }
 
             var command = new ReceiveMessageCommand(dto.Message, senderName, dto.SendTime);
             MessageReceived?.Invoke(this, command);
