@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +17,10 @@ namespace Connector
 
         // Карта известных адресов
         private readonly IPeerDirectory _peers;
+        private readonly int _myListeningPort;
+        private readonly Guid _myId;
 
+        private TcpListener? _listener;
         private bool _disposed;
         private bool _isReceiving;
         private CancellationTokenSource? _receiveCts;
@@ -28,11 +32,14 @@ namespace Connector
         // Для разлечения типов пакетов
         private const byte MessagePacketType = 1;
         private const byte PingPacketType = 2;
+        private const byte HelloPacketType = 3;
 
         // Конструктор
-        public Connector(IPeerDirectory peers)
+        public Connector(IPeerDirectory peers, Guid myId, int myListeningPort)
         {
             _peers = peers ?? throw new ArgumentNullException(nameof(peers));
+            _myId = myId;
+            _myListeningPort = myListeningPort;
         }
 
         #region Сериализация и отправка пакетов
@@ -162,26 +169,26 @@ namespace Connector
         public async Task<int> ConnectAsync(Guid address, CancellationToken token = default)
         {
             if (_activeConnections.TryGetValue(address, out var existingSocket) && existingSocket.Connected)
-            {
                 return 200;
-            }
 
             if (!_peers.TryGetEndpoint(address, out var endPoint))
-            {
                 return 404;
-            }
 
             try
             {
                 var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 await socket.ConnectAsync(endPoint, token).ConfigureAwait(false);
 
+                // РУКОПОЖАТИЕ 
+                var hello = SerializePacket(HelloPacketType, new HelloDTO(_myId, _myListeningPort));
+                await socket.SendAsync(hello, SocketFlags.None, token).ConfigureAwait(false);
+
                 _activeConnections[address] = socket;
-                return 200; // Соединение успешное
+                return 200;
             }
             catch
             {
-                return 503; // Узел недоступен
+                return 503;
             }
         }
 
@@ -219,14 +226,22 @@ namespace Connector
 
         public Task StartReciveAsync(CancellationToken token = default)
         {
+            CancellationToken loopToken;
+
             lock (_receiveLock)
             {
                 if (_isReceiving) return Task.CompletedTask;
 
                 _isReceiving = true;
                 _receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                loopToken = _receiveCts.Token;
+
+                _listener = new TcpListener(IPAddress.Any, _myListeningPort);
+                _listener.Start();
             }
-            Task.Run(() => GlobalReceiveMonitoringLoopAsync(_receiveCts.Token), _receiveCts.Token);
+
+            _ = AcceptLoopAsync(loopToken);
+            _ = Task.Run(() => GlobalReceiveMonitoringLoopAsync(loopToken), loopToken);
 
             return Task.CompletedTask;
         }
@@ -240,10 +255,98 @@ namespace Connector
                 _receiveCts?.Cancel();
                 _receiveCts?.Dispose();
                 _receiveCts = null;
+
+                try { _listener?.Stop(); } catch { }
+                _listener = null;
+
                 _isReceiving = false;
             }
-
             return Task.CompletedTask;
+        }
+
+        private async Task AcceptLoopAsync(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    var socket = await _listener.AcceptSocketAsync(token).ConfigureAwait(false);
+                    _ = HandleNewConnectionAsync(socket, token);
+                }
+                catch (OperationCanceledException) { break; }
+                catch { }
+            }
+        }
+
+        private async Task HandleNewConnectionAsync(Socket socket, CancellationToken token)
+        {
+            try
+            {
+                // Читаем первый пакет — обязан быть Hello.
+                var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
+
+                if (packetType != HelloPacketType)
+                {
+                    socket.Dispose();
+                    return;
+                }
+
+                var hello = JsonSerializer.Deserialize<HelloDTO>(jsonBytes);
+                if (hello is null || hello.Id == _myId)
+                {
+                    socket.Dispose();
+                    return;
+                }
+
+                _activeConnections[hello.Id] = socket;
+            }
+            catch
+            {
+                try { socket.Dispose(); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// Читает один пакет из сокета. Возвращает (тип пакета, JSON-байты).
+        /// Если соединение закрыто — бросает OperationCanceledException.
+        /// </summary>
+        private static async Task<(byte PacketType, byte[] JsonBytes)> ReadPacketAsync(
+            Socket socket, CancellationToken token)
+        {
+
+            var marker = new byte[1];
+            int read = await socket.ReceiveAsync(marker, SocketFlags.None, token).ConfigureAwait(false);
+            if (read == 0) throw new OperationCanceledException("Соединение закрыто.");
+
+            var lengthBuffer = new byte[4];
+            int total = 0;
+            while (total < 4)
+            {
+                token.ThrowIfCancellationRequested();
+                read = await socket.ReceiveAsync(
+                    new ArraySegment<byte>(lengthBuffer, total, 4 - total),
+                    SocketFlags.None, token).ConfigureAwait(false);
+                if (read == 0) throw new OperationCanceledException("Соединение закрыто.");
+                total += read;
+            }
+
+            int jsonLength = BitConverter.ToInt32(lengthBuffer, 0);
+            if (jsonLength <= 0 || jsonLength > 10 * 1024 * 1024)
+                throw new InvalidOperationException($"Некорректная длина пакета: {jsonLength}.");
+
+            var jsonBuffer = new byte[jsonLength];
+            total = 0;
+            while (total < jsonLength)
+            {
+                token.ThrowIfCancellationRequested();
+                read = await socket.ReceiveAsync(
+                    new ArraySegment<byte>(jsonBuffer, total, jsonLength - total),
+                    SocketFlags.None, token).ConfigureAwait(false);
+                if (read == 0) throw new OperationCanceledException("Соединение закрыто.");
+                total += read;
+            }
+
+            return (marker[0], jsonBuffer);
         }
 
         private async Task GlobalReceiveMonitoringLoopAsync(CancellationToken token)
@@ -274,90 +377,36 @@ namespace Connector
             }
         }
 
-        private async Task ReadFromSocketInternalAsync(Guid connectionsGuid, Socket socket, CancellationToken token)
+        private async Task ReadFromSocketInternalAsync(Guid connectionGuid, Socket socket, CancellationToken token)
         {
             try
             {
-                if (!socket.Connected || token.IsCancellationRequested)
+                if (!socket.Connected || token.IsCancellationRequested) return;
+
+                var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
+                string json = Encoding.UTF8.GetString(jsonBytes);
+
+                switch (packetType)
                 {
-                    return;
+                    case MessagePacketType:
+                        var msg = JsonSerializer.Deserialize<MessageDTO>(json);
+                        if (msg is not null) MessageReceived?.Invoke(this, msg);
+                        break;
+
+                    case PingPacketType:
+                        var ping = JsonSerializer.Deserialize<PingDTO>(json);
+                        if (ping is not null) PingReceived?.Invoke(this, ping);
+                        break;
+
                 }
-
-                // 1. Читаем маркер типа пакета (1 байт)
-                byte[] markerBuffer = new byte[1];
-                int bytesRead = await socket.ReceiveAsync(markerBuffer, SocketFlags.None, token).ConfigureAwait(false);
-                if (bytesRead == 0)
-                {
-                    Disconnect(connectionsGuid, "Удалённый узел разорвал соединение");
-                    return;
-                }
-                byte packetType = markerBuffer[0];
-
-                // 2. ИСПРАВЛЕНО: Надежное чтение ровно 4 байт длины JSON-пакета в цикле
-                byte[] lengthBuffer = new byte[4];
-                int totalLengthBytesRead = 0;
-                while (totalLengthBytesRead < 4)
-                {
-                    token.ThrowIfCancellationRequested();
-                    int read = await socket.ReceiveAsync(
-                        new ArraySegment<byte>(lengthBuffer, totalLengthBytesRead, 4 - totalLengthBytesRead),
-                        SocketFlags.None,
-                        token).ConfigureAwait(false);
-
-                    if (read == 0) return; // Сокет закрылся
-                    totalLengthBytesRead += read;
-                }
-
-                int jsonLength = BitConverter.ToInt32(lengthBuffer, 0);
-
-                // Защита от некорректных / слишком больших пакетов
-                if (jsonLength <= 0 || jsonLength > 10 * 1024 * 1024)
-                {
-                    return;
-                }
-
-                // 3. Вычитываем тело JSON
-                byte[] jsonBuffer = new byte[jsonLength];
-                int totalBytesReceived = 0;
-                while (totalBytesReceived < jsonLength)
-                {
-                    token.ThrowIfCancellationRequested();
-                    // ИСПРАВЛЕНО: Добавлен generic-параметр <byte> в ArraySegment
-                    int read = await socket.ReceiveAsync(
-                        new ArraySegment<byte>(jsonBuffer, totalBytesReceived, jsonLength - totalBytesReceived),
-                        SocketFlags.None,
-                        token).ConfigureAwait(false);
-
-                    if (read == 0)
-                    {
-                        return;
-                    }
-                    totalBytesReceived += read;
-                }
-
-                string json = Encoding.UTF8.GetString(jsonBuffer);
-
-                // 4. ИСПРАВЛЕНО: Добавлены generic-типы <MessageDTO> и <PingDTO> в десериализатор
-                if (packetType == MessagePacketType)
-                {
-                    var msgDto = JsonSerializer.Deserialize<MessageDTO>(json);
-                    if (msgDto != null)
-                    {
-                        MessageReceived?.Invoke(this, msgDto);
-                    }
-                }
-                else if (packetType == PingPacketType)
-                {
-                    var pingDto = JsonSerializer.Deserialize<PingDTO>(json);
-                    if (pingDto != null)
-                    {
-                        PingReceived?.Invoke(this, pingDto);
-                    }
-                }
+            }
+            catch (OperationCanceledException)
+            {
+                Disconnect(connectionGuid, "Соединение закрыто удалённой стороной.");
             }
             catch
             {
-                // Игнорируем сетевые ошибки, чтобы не уронить весь сервис
+
             }
         }
 

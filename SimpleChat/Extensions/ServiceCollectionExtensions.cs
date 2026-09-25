@@ -1,7 +1,7 @@
-﻿using System.Text.Json;
-using Abstractions.Interfaces;
-using Connector;
+﻿using System.Net;
+using System.Text.Json;
 using Connector.PeerDirectory;
+using Connector.PeerDiscovery;
 using Microsoft.Extensions.DependencyInjection;
 using SimpleChat.Core.MessageFactory;
 using SimpleChat.Core.MessageHandler;
@@ -23,10 +23,28 @@ namespace SimpleChat.Extensions
         {
             services.AddSingleton<UserInfo>(provider => GetUserInfo());
 
-            services.AddSingleton<IPeerDirectory>(_ =>
-                PeerDirectory.FromJsonFile("peers.json"));
+            const int TcpPort = 5001;
 
-            services.AddSingleton<IConnector, Connector.Connector>();
+            services.AddSingleton<IPeerDiscovery>(sp =>
+            {
+                var user = sp.GetRequiredService<UserInfo>();
+                return new UdpDiscovery(user.UserId, TcpPort, user.LocalName);
+            });
+
+            services.AddSingleton<IPeerDirectory>(sp =>
+            {
+                var discovery = sp.GetRequiredService<IPeerDiscovery>();
+                var staticPeers = TryLoadPeersJson("peers.json");
+                return new HybridPeerDirectory(staticPeers, discovery);
+            });
+
+            services.AddSingleton<IConnector>(sp =>
+            {
+                var user = sp.GetRequiredService<UserInfo>();
+                var peers = sp.GetRequiredService<IPeerDirectory>();
+                const int tcpPort = TcpPort;
+                return new Connector.Connector(peers, user.UserId, tcpPort);
+            });
 
             services.AddSingleton<IUserRegistry, UserRegistry>();
             services.AddSingleton<MessageService>();
@@ -39,6 +57,36 @@ namespace SimpleChat.Extensions
             services.AddSingleton<IMessageFactory, MessageFactory>();
 
             return services;
+        }
+
+        private static IDictionary<Guid, IPEndPoint>? TryLoadPeersJson(string path)
+        {
+            if (!File.Exists(path)) return null;
+
+            try
+            {
+                var raw = JsonSerializer
+                    .Deserialize<Dictionary<string, string>>(File.ReadAllText(path));
+                if (raw is null) return null;
+
+                var result = new Dictionary<Guid, IPEndPoint>();
+                foreach (var (key, value) in raw)
+                {
+                    if (!Guid.TryParse(key, out var id)) continue;
+
+                    var parts = value.Split(':');
+                    if (parts.Length != 2) continue;
+                    if (!IPAddress.TryParse(parts[0], out var ip)) continue;
+                    if (!int.TryParse(parts[1], out var port)) continue;
+
+                    result[id] = new IPEndPoint(ip, port);
+                }
+                return result;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static UserInfo GetUserInfo()

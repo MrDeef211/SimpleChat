@@ -1,6 +1,6 @@
 ﻿namespace Abstractions.Commands
 {
-    public class MessageReceivedEventArgs
+    public class MessageReceivedEventArgs : EventArgs
     {
         public string Message { get; set; }
 
