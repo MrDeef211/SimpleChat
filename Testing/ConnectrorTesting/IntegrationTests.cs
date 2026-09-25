@@ -79,18 +79,17 @@ namespace Testing.ConnectrorTesting
             var connA = new Mock<IConnector>();
             var connB = new Mock<IConnector>();
 
-            var svcA = new MessageService(connA.Object, regA, new UserInfo(peerA, "A"),
-                discoveryTimeout: TimeSpan.FromMilliseconds(30),
-                sendTimeout: TimeSpan.FromMilliseconds(200));
-            var svcB = new MessageService(connB.Object, regB, new UserInfo(peerB, "B"),
-                discoveryTimeout: TimeSpan.FromMilliseconds(30),
-                sendTimeout: TimeSpan.FromMilliseconds(200));
+            connA.Setup(c => c.GetKnownPeers()).Returns(Array.Empty<Guid>());
+            connB.Setup(c => c.GetKnownPeers()).Returns(Array.Empty<Guid>());
+
+            var svcA = new MessageService(connA.Object, regA, new UserInfo(peerA, "A"));
+            var svcB = new MessageService(connB.Object, regB, new UserInfo(peerB, "B"));
 
             var nameB = regA.GetOrAddName(peerB);
             var nameA = regB.GetOrAddName(peerA);
 
-            connA.Setup(c => c.GetKnownPeers()).Returns(Array.Empty<Guid>());
-            connB.Setup(c => c.GetKnownPeers()).Returns(Array.Empty<Guid>());
+            connA.Setup(c => c.ConnectAsync(peerB, It.IsAny<CancellationToken>())).ReturnsAsync(200);
+            connB.Setup(c => c.ConnectAsync(peerA, It.IsAny<CancellationToken>())).ReturnsAsync(200);
 
             connA
                 .Setup(c => c.SendAsync(It.IsAny<MessageDTO>(), peerB, It.IsAny<CancellationToken>()))
@@ -104,6 +103,9 @@ namespace Testing.ConnectrorTesting
             await svcA.ConnectAsync(nameB);
             await svcB.ConnectAsync(nameA);
 
+            Assert.True(svcB.IsConnected(nameA),
+                $"svcB должен быть подключён к {nameA}. Connected: [{string.Join(", ", svcB.GetConnectedUsers())}]");
+
             var receivedOnB = new TaskCompletionSource<ReceiveMessageCommand>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             svcB.MessageReceived += (_, c) => receivedOnB.TrySetResult(c);
@@ -112,7 +114,8 @@ namespace Testing.ConnectrorTesting
                 new SendMessageCommand("hello B", peerA, nameB, DateTime.UtcNow));
 
             var completed = await Task.WhenAny(receivedOnB.Task, Task.Delay(2000));
-            Assert.Same(receivedOnB.Task, completed);
+            Assert.True(completed == receivedOnB.Task,
+                $"Сообщение не пришло за 2 секунды. Connected на svcB: [{string.Join(", ", svcB.GetConnectedUsers())}]");
 
             var cmd = await receivedOnB.Task;
             Assert.Equal("hello B", cmd.Message);

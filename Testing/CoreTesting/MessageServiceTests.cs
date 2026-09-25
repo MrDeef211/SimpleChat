@@ -30,6 +30,20 @@ namespace Testing.CoreTesting
                 sendTimeout: FastSend);
         }
 
+        /// <summary>
+        /// Помечает пира как «подключённого» в MessageService — так,
+        /// как будто ConnectAsync завершился успешно.
+        /// </summary>
+        private string MarkPeerConnected(Guid peerId)
+        {
+            var name = _registry.GetOrAddName(peerId);
+            _connector.Setup(c => c.Connect(peerId)).Returns(200);
+            var result = _service.Connect(name);
+            Assert.Equal(200, result);
+            Assert.True(_service.IsConnected(name));
+            return name;
+        }
+
         public void Dispose() => _service.Dispose();
 
         // ================= Connect / Disconnect =================
@@ -237,7 +251,7 @@ namespace Testing.CoreTesting
         public void MessageReceived_FromKnownSender_RaisesWithResolvedName()
         {
             var peerId = Guid.NewGuid();
-            string peerName = _registry.GetOrAddName(peerId);
+            string peerName = MarkPeerConnected(peerId);
 
             ReceiveMessageCommand? received = null;
             _service.MessageReceived += (_, c) => received = c;
@@ -255,6 +269,7 @@ namespace Testing.CoreTesting
         public void MessageReceived_FromUnknownSender_RegistersNewName()
         {
             var peerId = Guid.NewGuid();
+            string peerName = MarkPeerConnected(peerId);
             ReceiveMessageCommand? received = null;
             _service.MessageReceived += (_, c) => received = c;
 
@@ -271,6 +286,7 @@ namespace Testing.CoreTesting
         public void MessageReceived_PreservesUtcTime()
         {
             var peerId = Guid.NewGuid();
+            string peerName = MarkPeerConnected(peerId);
             _registry.GetOrAddName(peerId);
             var time = new DateTime(2026, 9, 22, 10, 30, 0, DateTimeKind.Utc);
 
