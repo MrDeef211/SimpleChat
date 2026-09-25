@@ -214,6 +214,8 @@ namespace Connector
         private void OnPingReceived(PingDTO dto) =>
             PingReceived?.Invoke(this, dto);
 
+        public IReadOnlyCollection<Guid> GetKnownPeers() => [];
+
         public void Dispose()
         {
             if (_disposed) return;

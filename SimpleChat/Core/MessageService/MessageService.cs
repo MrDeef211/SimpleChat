@@ -133,51 +133,22 @@ namespace SimpleChat.Core.MessageService
 
         public List<string> GetUsers()
         {
-            var collected = new ConcurrentDictionary<Guid, byte>();
+            Thread.Sleep(_discoveryTimeout);
 
-            void OnPing(object? _, PingDTO ping)
-            {
-                if (ping.Sender != _localId)
-                    collected.TryAdd(ping.Sender, 0);
-            }
-
-            _connector.PingReceived += OnPing;
-            try
-            {
-                _connector.Broadcast(new PingDTO(_localId, DateTime.UtcNow, "discover"));
-                Thread.Sleep(_discoveryTimeout);
-            }
-            finally
-            {
-                _connector.PingReceived -= OnPing;
-            }
-
-            return collected.Keys.Select(_registry.GetOrAddName).ToList();
+            return _connector.GetKnownPeers()
+                .Where(id => id != _localId)
+                .Select(_registry.GetOrAddName)
+                .ToList();
         }
 
         public async Task<List<string>> GetUsersAsync()
         {
-            var collected = new ConcurrentDictionary<Guid, byte>();
+            await Task.Delay(_discoveryTimeout).ConfigureAwait(false);
 
-            void OnPing(object? _, PingDTO ping)
-            {
-                if (ping.Sender != _localId)
-                    collected.TryAdd(ping.Sender, 0);
-            }
-
-            _connector.PingReceived += OnPing;
-            try
-            {
-                await _connector.BroadcastAsync(new PingDTO(_localId, DateTime.UtcNow, "discover"))
-                                .ConfigureAwait(false);
-                await Task.Delay(_discoveryTimeout).ConfigureAwait(false);
-            }
-            finally
-            {
-                _connector.PingReceived -= OnPing;
-            }
-
-            return collected.Keys.Select(_registry.GetOrAddName).ToList();
+            return _connector.GetKnownPeers()
+                .Where(id => id != _localId)
+                .Select(_registry.GetOrAddName)
+                .ToList();
         }
 
         public bool IsConnected(string user) => _connected.ContainsKey(user);

@@ -168,5 +168,8 @@ namespace SimpleChat.Interfaces
         /// </remarks>
         Task StopReciveAsync();
 
+
+        IReadOnlyCollection<Guid> GetKnownPeers();
+
     }
 }

@@ -84,10 +84,12 @@ namespace SimpleChat.Extensions
 
                     result[id] = new IPEndPoint(ip, port);
                 }
+                Console.WriteLine($"[PEERS] Загружено {result.Count} адресов из {path}");
                 return result;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[PEERS] Ошибка загрузки {path}: {ex.Message}");
                 return null;
             }
         }

@@ -167,6 +167,8 @@ namespace Connector
 
         #region Соединение
 
+        public IReadOnlyCollection<Guid> GetKnownPeers() => _peers.KnownPeers;
+
         public int Connect(Guid address)
         {
             try
@@ -251,10 +253,15 @@ namespace Connector
 
                 _listener = new TcpListener(IPAddress.Any, _myListeningPort);
                 _listener.Start();
+                Console.WriteLine($"[Connector] Listener started on port {_myListeningPort}");
             }
 
             if (_discovery is not null)
+            {
+                Console.WriteLine($"[Connector] Starting discovery...");
                 await _discovery.StartAsync(loopToken).ConfigureAwait(false);
+            }
+
 
             _ = AcceptLoopAsync(loopToken);
             _ = Task.Run(() => GlobalReceiveMonitoringLoopAsync(loopToken), loopToken);
