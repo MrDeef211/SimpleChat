@@ -4,9 +4,9 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Abstractions.DTO;
+using Abstractions.Interfaces;
 using Connector.PeerDirectory;
 using Connector.PeerDiscovery;
-using Abstractions.Interfaces;
 
 
 namespace Connector
@@ -26,17 +26,22 @@ namespace Connector
 
         private int _disposed;
         private bool _isReceiving;
-        private CancellationTokenSource? _receiveCts;
         private readonly object _receiveLock = new object();
+        private CancellationTokenSource? _receiveCts;
+
+        private Dictionary<Guid, CancellationTokenSource> Sources = new();
 
         public event EventHandler<MessageDTO>? MessageReceived;
         public event EventHandler<PingDTO>? PingReceived;
+        public event EventHandler<HelloDTO>? HelloReceived;
         public event EventHandler<Guid>? PeerDisconnected;
 
         // Для разлечения типов пакетов
         private const byte MessagePacketType = 1;
         private const byte PingPacketType = 2;
         private const byte HelloPacketType = 3;
+
+        private readonly TimeSpan _connectTimeout = TimeSpan.FromSeconds(10);
 
         // Конструктор
         public Connector(
@@ -208,7 +213,17 @@ namespace Connector
 
             var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            handshakeCts.CancelAfter(TimeSpan.FromSeconds(3));
+            handshakeCts.CancelAfter(_connectTimeout);
+
+            var helloAck = new TaskCompletionSource<HelloDTO>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            void OnHello(object? _, HelloDTO h)
+            {
+                if (h.Id == address)
+                    helloAck.TrySetResult(h);
+            }
+
+            HelloReceived += OnHello;
 
             try
             {
@@ -217,25 +232,29 @@ namespace Connector
                 var hello = SerializePacket(HelloPacketType, new HelloDTO(_myId, _myListeningPort));
                 await socket.SendAsync(hello, SocketFlags.None, handshakeCts.Token).ConfigureAwait(false);
 
-                var (ackType, ackJson) = await ReadPacketAsync(socket, handshakeCts.Token).ConfigureAwait(false);
-                if (ackType != HelloPacketType)
-                {
-                    Console.WriteLine($"[Connector] Handshake failed for {address:N}: unexpected packet type {ackType}");
-                    socket.Dispose();
-                    return 503;
-                }
+                var readTask = Task.Run(() => ReadLoopAsync(address, socket, handshakeCts.Token), handshakeCts.Token);
 
-                var remoteHello = JsonSerializer.Deserialize<HelloDTO>(ackJson);
-                if (remoteHello is null || remoteHello.Id != address)
+                using (handshakeCts.Token.Register(() => helloAck.TrySetCanceled()))
                 {
-                    Console.WriteLine($"[Connector] Handshake failed for {address:N}: id mismatch");
-                    socket.Dispose();
-                    return 503;
-                }
+                    HelloDTO ack;
+                    try
+                    {
+                        ack = await helloAck.Task.ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        Console.WriteLine($"[Connector] Handshake timeout for {address:N}");
+                        try { socket.Dispose(); } catch { }
+                        return 503;
+                    }
 
-                _activeConnections[address] = socket;
-                Console.WriteLine($"[Connector] Connect to {address:N} OK (handshake complete)");
-                return 200;
+                    _activeConnections[address] = socket;
+                    Console.WriteLine($"[Connector] Connect to {address:N} OK (handshake complete)");
+
+                    Sources.Add(address, new());
+                    _ = ReadLoopAsync(address, socket, Sources[address].Token);
+                    return 200;
+                }
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {
@@ -248,6 +267,10 @@ namespace Connector
                 Console.WriteLine($"[Connector] Connect err: {ex.Message}");
                 try { socket.Dispose(); } catch { }
                 return 503;
+            }
+            finally
+            {
+                HelloReceived -= OnHello;
             }
         }
 
@@ -265,6 +288,9 @@ namespace Connector
                 {
                     try { socket.Close(); } catch { }
                     try { socket.Dispose(); } catch { }
+                    try { Sources[address].Cancel(); } catch { }
+                    try { Sources[address].Dispose(); } catch { }
+                    try { Sources.Remove(address); } catch { }
                 }
 
                 Console.WriteLine($"[Connector] Disconnected {address:N} ({reason})");
@@ -306,7 +332,6 @@ namespace Connector
 
 
             _ = AcceptLoopAsync(loopToken);
-            _ = Task.Run(() => GlobalReceiveMonitoringLoopAsync(loopToken), loopToken);
         }
 
         public async Task StopReciveAsync()
@@ -348,6 +373,9 @@ namespace Connector
             }
         }
 
+        /// <summary>
+        /// Ответ на подключение нового пользователя
+        /// </summary>
         private async Task HandleNewConnectionAsync(Socket socket, CancellationToken token)
         {
             try
@@ -382,6 +410,9 @@ namespace Connector
 
                 _activeConnections[hello.Id] = socket;
                 Console.WriteLine($"[Connector] Accepted connection from {hello.Id:N}");
+
+                Sources.Add(hello.Id, new());
+                _ = ReadLoopAsync(hello.Id, socket, Sources[hello.Id].Token);
 
                 var ack = SerializePacket(HelloPacketType, new HelloDTO(_myId, _myListeningPort));
                 try
@@ -421,8 +452,8 @@ namespace Connector
         }
 
         /// <summary>
-        /// Читает один пакет из сокета. Возвращает (тип пакета, JSON-байты).
-        /// Если соединение закрыто — бросает OperationCanceledException.
+        /// Читает один пакет из сокета. Возвращает (тип пакета, JSON-байты)
+        /// Если соединение закрыто — бросает OperationCanceledException
         /// </summary>
         private static async Task<(byte PacketType, byte[] JsonBytes)> ReadPacketAsync(
             Socket socket, CancellationToken token)
@@ -463,31 +494,32 @@ namespace Connector
             return (marker[0], jsonBuffer);
         }
 
-        private async Task GlobalReceiveMonitoringLoopAsync(CancellationToken token)
+        /// <summary>
+        /// Обработать входящий пакет
+        /// </summary>
+        private void ProcessPacket(byte packetType, byte[] jsonBytes)
         {
-            try
+            string json = Encoding.UTF8.GetString(jsonBytes);
+            switch (packetType)
             {
-                while (!token.IsCancellationRequested)
-                {
-                    var readTasks = new List<Task>();
+                case MessagePacketType:
+                    var msg = JsonSerializer.Deserialize<MessageDTO>(json);
+                    if (msg is not null) MessageReceived?.Invoke(this, msg);
+                    break;
 
-                    foreach (var pair in _activeConnections)
-                    {
-                        readTasks.Add(ReadFromSocketInternalAsync(pair.Key, pair.Value, token));
-                    }
+                case PingPacketType:
+                    var ping = JsonSerializer.Deserialize<PingDTO>(json);
+                    if (ping is not null) PingReceived?.Invoke(this, ping);
+                    break;
 
-                    if (readTasks.Count == 0)
-                    {
-                        await Task.Delay(100, token).ConfigureAwait(false);
-                        continue;
-                    }
+                case HelloPacketType:
+                    var hello = JsonSerializer.Deserialize<HelloDTO>(json);
+                    if (hello is not null) HelloReceived?.Invoke(this, hello);
+                    break;
 
-                    await Task.WhenAny(readTasks).ConfigureAwait(false);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-
+                default:
+                    Console.WriteLine($"[Connector] Unknown packet type: {packetType}");
+                    break;
             }
         }
 
@@ -506,42 +538,28 @@ namespace Connector
             }
         }
 
-        private async Task ReadFromSocketInternalAsync(Guid connectionGuid, Socket socket, CancellationToken token)
+        private async Task ReadLoopAsync(Guid peerId, Socket socket, CancellationToken token)
         {
             try
             {
-                if (!socket.Connected || token.IsCancellationRequested) return;
-
-                var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
-                string json = Encoding.UTF8.GetString(jsonBytes);
-
-                switch (packetType)
+                while (!token.IsCancellationRequested && socket.Connected)
                 {
-                    case MessagePacketType:
-                        var msg = JsonSerializer.Deserialize<MessageDTO>(json);
-                        if (msg is not null) MessageReceived?.Invoke(this, msg);
-                        break;
-
-                    case PingPacketType:
-                        var ping = JsonSerializer.Deserialize<PingDTO>(json);
-                        if (ping is not null) PingReceived?.Invoke(this, ping);
-                        break;
+                    var (packetType, jsonBytes) = await ReadPacketAsync(socket, token).ConfigureAwait(false);
+                    ProcessPacket(packetType, jsonBytes);
                 }
             }
             catch (OperationCanceledException)
             {
-                DisconnectIfSame(connectionGuid, socket, "Соединение закрыто удалённой стороной.");
+                DisconnectIfSame(peerId, socket, "Соединение закрыто.");
             }
             catch (SocketException)
             {
-                DisconnectIfSame(connectionGuid, socket, "Сетевая ошибка при чтении.");
+                DisconnectIfSame(peerId, socket, "Сетевая ошибка при чтении.");
             }
-            catch (ObjectDisposedException)
-            {
-            }
+            catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Connector] Read error: {ex}");
+                Console.WriteLine($"[Connector] Read loop {peerId:N} error: {ex}");
             }
         }
 

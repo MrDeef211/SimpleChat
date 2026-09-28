@@ -27,6 +27,14 @@ namespace Abstractions.Interfaces
         /// </remarks>
         event EventHandler<PingDTO>? PingReceived;
 
+        /// <summary>
+        /// Событие получения сообщения соеденения
+        /// </summary>
+        event EventHandler<HelloDTO>? HelloReceived;
+
+        /// <summary>
+        /// Событие одключение узла от сети
+        /// </summary>
         event EventHandler<Guid>? PeerDisconnected;
 
         /// <summary>

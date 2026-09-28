@@ -10,7 +10,7 @@ namespace Connector.Extensions
     public static class ConnectorServiceCollectionExtensions
     {
         /// <summary>
-        /// Регистрирует транспортный слой: коннектор, discovery, реестр пиров.
+        /// Регистрирует транспортный слой: коннектор, discovery, реестр пиров
         /// Настройки читаются из connector.json.
         /// </summary>
         public static IServiceCollection AddConnectorServices(
@@ -19,7 +19,6 @@ namespace Connector.Extensions
         {
             var settings = ConnectorSettings.Load(settingsPath);
 
-            // Discovery.
             services.AddSingleton<UdpDiscovery>(sp =>
             {
 

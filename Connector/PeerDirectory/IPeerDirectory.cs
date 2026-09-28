@@ -8,7 +8,7 @@ namespace Connector.PeerDirectory
         event EventHandler<Guid>? PeerLost;
 
         /// <summary>
-        /// Попытаться получить endpoint узла по его Guid.
+        /// Попытаться получить endpoint узла по его Guid
         /// </summary>
         /// <param name="id">Guid-адрес узла.</param>
         /// <param name="endpoint">Endpoint узла, если он известен.</param>
@@ -16,7 +16,7 @@ namespace Connector.PeerDirectory
         bool TryGetEndpoint(Guid id, out IPEndPoint endpoint);
 
         /// <summary>
-        /// Все известные узлы.
+        /// Все известные узлы
         /// </summary>
         IReadOnlyCollection<Guid> KnownPeers
         {
