@@ -3,6 +3,11 @@
     public interface IConnectionService
     {
         /// <summary>
+        /// Событие обработки попытки подключения
+        /// </summary>
+        event Func<object?, string, bool>? PeerTryConnect;
+
+        /// <summary>
         /// Пользователь успешно подключён
         /// </summary>
         event EventHandler<string>? UserConnected;

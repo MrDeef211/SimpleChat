@@ -11,6 +11,8 @@ namespace Abstractions.Core.MessageService
     {
         public event EventHandler<ReceiveMessageCommand>? MessageReceived;
 
+        public event Func<object?, string, bool>? PeerTryConnect;
+
         public event EventHandler<string>? UserConnected;
 
         public event EventHandler<string>? UserDisconnected;
@@ -43,6 +45,7 @@ namespace Abstractions.Core.MessageService
 
             _connector.MessageReceived += OnConnectorMessageReceived;
             _connector.PeerDisconnected += OnConnectorPeerDisconnected;
+            _connector.PeerTryConnect += OnConnectorPeerTryConnecting;
         }
 
         #region Запуск конектора
@@ -135,6 +138,16 @@ namespace Abstractions.Core.MessageService
         #endregion
 
         #region Работа с пользователями
+
+        private bool OnConnectorPeerTryConnecting(object? sender, Guid id)
+        {
+            string? name;
+            if (_registry.TryGetName(id, out name))
+            {
+                return PeerTryConnect?.Invoke(sender, name) ?? false;
+            }
+            return false;
+        }
 
         private void OnConnectorPeerDisconnected(object? sender, Guid peerId)
         {

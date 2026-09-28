@@ -9,6 +9,8 @@ namespace Connector
         public event EventHandler<MessageDTO>? MessageReceived;
         public event EventHandler<PingDTO>? PingReceived;
         public event EventHandler<Guid>? PeerDisconnected;
+        public event EventHandler<HelloDTO>? HelloReceived;
+        public event Func<object?, Guid, bool>? PeerTryConnect;
 
         /// <summary>
         /// Искусственная задержка сетевых операций

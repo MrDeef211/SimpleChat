@@ -31,6 +31,8 @@ namespace Connector
 
         private Dictionary<Guid, CancellationTokenSource> Sources = new();
 
+        public event Func<object?, Guid, bool>? PeerTryConnect;
+
         public event EventHandler<MessageDTO>? MessageReceived;
         public event EventHandler<PingDTO>? PingReceived;
         public event EventHandler<HelloDTO>? HelloReceived;
@@ -41,7 +43,7 @@ namespace Connector
         private const byte PingPacketType = 2;
         private const byte HelloPacketType = 3;
 
-        private readonly TimeSpan _connectTimeout = TimeSpan.FromSeconds(10);
+        private readonly TimeSpan _connectTimeout = TimeSpan.FromSeconds(3);
 
         // Конструктор
         public Connector(
@@ -406,6 +408,15 @@ namespace Connector
                 {
                     Console.WriteLine($"[Connector] Replacing dead connection to {hello.Id:N}");
                     try { dead.Dispose(); } catch { }
+                }
+
+                bool connect = PeerTryConnect?.Invoke(this, hello.Id) ?? false;
+
+                if (!connect)
+                {
+                    Console.WriteLine($"[Connector] Client cancel connection from {hello.Id:N}");
+                    try { socket.Dispose(); } catch { }
+                    return;
                 }
 
                 _activeConnections[hello.Id] = socket;

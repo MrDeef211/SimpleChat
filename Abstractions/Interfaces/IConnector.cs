@@ -38,6 +38,11 @@ namespace Abstractions.Interfaces
         event EventHandler<Guid>? PeerDisconnected;
 
         /// <summary>
+        /// Событие обработки попытки подключения
+        /// </summary>
+        event Func<object?, Guid, bool> PeerTryConnect;
+
+        /// <summary>
         /// Синхронно отправить сообщение конкретному узлу.
         /// </summary>
         /// <param name="message">Тело сообщения и метаданные отправителя.</param>

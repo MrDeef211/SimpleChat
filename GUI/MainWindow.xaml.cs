@@ -36,6 +36,7 @@ namespace GUI
             _connectionService.UserConnected += OnUserConnected;
             _connectionService.UserDisconnected += OnUserDisconnected;
             _connectionService.UserRenamed += OnUserRenamed;
+            _connectionService.PeerTryConnect += OnUserTryConnect;
 
             LstUsers.ItemsSource = _users;
             LstUsers.SelectionChanged += LstUsers_SelectionChanged;
@@ -113,6 +114,17 @@ namespace GUI
             BtnSend.IsEnabled = LstUsers.SelectedItem is UserListItem;
         }
 
+        private bool OnUserTryConnect(object? sender, string name)
+        {
+            MessageBoxResult result = MessageBox.Show(
+                $"Пользователь \"{name}\" хочет подключится \n"
+                , "Разрешить подключение?", 
+                MessageBoxButton.YesNo, 
+                MessageBoxImage.Question); 
+
+            return result == MessageBoxResult.Yes;
+        }
+
         private async void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             BtnRefresh.IsEnabled = false;
@@ -153,7 +165,6 @@ namespace GUI
                 BtnConnect.IsEnabled = false;
                 int result = await _connectionService.ConnectAsync(user.Name);
                 MessageBox.Show($"Подключение к '{user.Name}': {result}");
-                // Индикатор обновится сам через событие UserConnected.
             }
             catch (Exception ex)
             {
